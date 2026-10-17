@@ -157,4 +157,11 @@ impl Entity {
             .await?;
         Ok(())
     }
+
+    /// 清空章节缓存（正文抽取格式升级后调用；已下载到本地的章节存在 novel_download_chapter，不受影响）
+    pub async fn delete_all() -> Result<(), DbErr> {
+        let db = database::ACTIVE_DB_CONNECT.get().unwrap().lock().await;
+        Entity::delete_many().exec(db.deref()).await?;
+        Ok(())
+    }
 }

@@ -25,4 +25,4 @@ class AppInfo {
 
   /// 获取应用包名
   static String get packageName => _packageInfo?.packageName ?? '';
-} 
+}

@@ -1,12 +1,14 @@
+import 'package:wild/l10n/content_language.dart';
 import 'package:flutter/material.dart';
 import 'package:wild/src/rust/api/database.dart';
 import 'package:wild/src/rust/api/wenku8.dart';
 import 'package:wild/src/rust/wenku8/models.dart';
 import 'package:wild/widgets/novel_cover_card.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 class CategoryPage extends StatefulWidget {
   final String? initialTag;
-  
+
   const CategoryPage({super.key, this.initialTag});
 
   @override
@@ -130,11 +132,11 @@ class _CategoryPageState extends State<CategoryPage> {
               Expanded(
                 child: SegmentedButton<String>(
                   showSelectedIcon: false,
-                  segments: const [
-                    ButtonSegment(value: "0", label: Text('更新')),
-                    ButtonSegment(value: "1", label: Text('热门')),
-                    ButtonSegment(value: "2", label: Text('完结')),
-                    ButtonSegment(value: "3", label: Text('动画')),
+                  segments: [
+                    ButtonSegment(value: "0", label: Text(l10n('更新'))),
+                    ButtonSegment(value: "1", label: Text(l10n('热门'))),
+                    ButtonSegment(value: "2", label: Text(l10n('完结'))),
+                    ButtonSegment(value: "3", label: Text(l10n('动画'))),
                   ],
                   selected: {_viewMode},
                   onSelectionChanged: (Set<String> selection) {
@@ -153,7 +155,7 @@ class _CategoryPageState extends State<CategoryPage> {
                 Padding(
                   padding: const EdgeInsets.only(left: 8),
                   child: PopupMenuButton<String>(
-                    tooltip: '分类',
+                    tooltip: l10n('分类'),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -169,7 +171,9 @@ class _CategoryPageState extends State<CategoryPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            _selectedTag ?? '分类',
+                            _selectedTag == null
+                                ? l10n('分类')
+                                : cv(_selectedTag!),
                             style: TextStyle(
                               color:
                                   _selectedTag != null
@@ -193,7 +197,7 @@ class _CategoryPageState extends State<CategoryPage> {
                           PopupMenuItem<String>(
                             enabled: false,
                             child: Text(
-                              group.title,
+                              cv(group.title),
                               style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -208,7 +212,7 @@ class _CategoryPageState extends State<CategoryPage> {
                               child: Padding(
                                 padding: const EdgeInsets.only(left: 16),
                                 child: Text(
-                                  tag,
+                                  cv(tag),
                                   style: TextStyle(
                                     fontSize: 14,
                                     color:
@@ -253,7 +257,7 @@ class _CategoryPageState extends State<CategoryPage> {
                       _loadTags();
                     },
                     icon: const Icon(Icons.refresh),
-                    label: const Text('重试加载分类'),
+                    label: Text(l10n('重试加载分类')),
                     style: TextButton.styleFrom(
                       foregroundColor: Theme.of(context).colorScheme.error,
                     ),
@@ -275,7 +279,7 @@ class _CategoryPageState extends State<CategoryPage> {
         Expanded(
           child:
               _selectedTag == null
-                  ? const Center(child: Text('请选择分类'))
+                  ? Center(child: Text(l10n('请选择分类')))
                   : _errorMessage != null
                   ? RefreshIndicator(
                     onRefresh: () => _loadTagPage(_selectedTag!, refresh: true),
@@ -294,7 +298,7 @@ class _CategoryPageState extends State<CategoryPage> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                '加载失败 (下拉刷新)',
+                                l10n('加载失败 (下拉刷新)'),
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 8),

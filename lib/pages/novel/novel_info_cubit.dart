@@ -42,11 +42,13 @@ class NovelInfoCubit extends Cubit<NovelInfoState> {
       final novelInfo = await w8.novelInfo(aid: novelId);
       _volumes = await w8.novelReader(aid: novelId);
       final readingHistory = await w8.novelHistoryById(novelId: novelId);
-      emit(NovelInfoLoaded(
-        novelInfo: novelInfo,
-        volumes: _volumes,
-        readingHistory: readingHistory,
-      ));
+      emit(
+        NovelInfoLoaded(
+          novelInfo: novelInfo,
+          volumes: _volumes,
+          readingHistory: readingHistory,
+        ),
+      );
     } catch (e) {
       emit(NovelInfoError(e.toString()));
     }
@@ -56,11 +58,13 @@ class NovelInfoCubit extends Cubit<NovelInfoState> {
     final readingHistory = await w8.novelHistoryById(novelId: novelId);
     if (state is NovelInfoLoaded) {
       final currentState = state as NovelInfoLoaded;
-      emit(NovelInfoLoaded(
-        novelInfo: currentState.novelInfo,
-        volumes: currentState.volumes,
-        readingHistory: readingHistory,
-      ));
+      emit(
+        NovelInfoLoaded(
+          novelInfo: currentState.novelInfo,
+          volumes: currentState.volumes,
+          readingHistory: readingHistory,
+        ),
+      );
     }
   }
-} 
+}

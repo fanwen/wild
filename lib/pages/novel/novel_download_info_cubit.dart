@@ -1,3 +1,4 @@
+import 'package:wild/l10n/ui_language.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wild/src/rust/api/wenku8.dart' as w8;
 import 'package:wild/src/rust/api/database.dart' as database;
@@ -39,40 +40,46 @@ class NovelDownloadInfoCubit extends Cubit<NovelDownloadInfoState> {
     try {
       final download = await w8.existsDownload(novelId: novelId);
       if (download == null) {
-        emit(NovelDownloadInfoError('未找到下载信息'));
+        emit(NovelDownloadInfoError(l10n('未找到下载信息')));
         return;
       }
 
       // 从下载数据构建卷和章节列表
-      final volumes = download.novelDownloadVolume
-          .map((volume) {
-            final chapters = download.novelDownloadChapter
-                .where((chapter) => chapter.volumeId == volume.id)
-                .map((chapter) => Chapter(
-                      aid: chapter.aid,
-                      cid: chapter.id,
-                      title: chapter.title,
-                      url: chapter.url,
-                    ))
-                .toList();
-            // 只返回有章节的卷
-            if (chapters.isEmpty) return null;
-            return Volume(
-              id: volume.id,
-              title: volume.title,
-              chapters: chapters,
-            );
-          })
-          .where((volume) => volume != null) // 过滤掉 null
-          .map((volume) => volume!) // 将非空的卷转换为非空类型
-          .toList();
+      final volumes =
+          download.novelDownloadVolume
+              .map((volume) {
+                final chapters =
+                    download.novelDownloadChapter
+                        .where((chapter) => chapter.volumeId == volume.id)
+                        .map(
+                          (chapter) => Chapter(
+                            aid: chapter.aid,
+                            cid: chapter.id,
+                            title: chapter.title,
+                            url: chapter.url,
+                          ),
+                        )
+                        .toList();
+                // 只返回有章节的卷
+                if (chapters.isEmpty) return null;
+                return Volume(
+                  id: volume.id,
+                  title: volume.title,
+                  chapters: chapters,
+                );
+              })
+              .where((volume) => volume != null) // 过滤掉 null
+              .map((volume) => volume!) // 将非空的卷转换为非空类型
+              .toList();
 
       final history = await w8.novelHistoryById(novelId: novelId);
-      emit(NovelDownloadInfoLoaded(
-        download: download,
-        volumes: volumes,
-        readingHistory: history,
-      ));
+      emit(
+        NovelDownloadInfoLoaded(
+          download: download,
+          volumes: volumes,
+          readingHistory: history,
+        ),
+      );
     } catch (e) {
       emit(NovelDownloadInfoError(e.toString()));
     }
@@ -82,11 +89,13 @@ class NovelDownloadInfoCubit extends Cubit<NovelDownloadInfoState> {
     final readingHistory = await w8.novelHistoryById(novelId: novelId);
     if (state is NovelDownloadInfoLoaded) {
       final currentState = state as NovelDownloadInfoLoaded;
-      emit(NovelDownloadInfoLoaded(
-        download: currentState.download,
-        volumes: currentState.volumes,
-        readingHistory: readingHistory,
-      ));
+      emit(
+        NovelDownloadInfoLoaded(
+          download: currentState.download,
+          volumes: currentState.volumes,
+          readingHistory: readingHistory,
+        ),
+      );
     }
   }
 
@@ -99,4 +108,4 @@ class NovelDownloadInfoCubit extends Cubit<NovelDownloadInfoState> {
       }
     }
   }
-} 
+}

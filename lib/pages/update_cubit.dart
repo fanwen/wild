@@ -11,18 +11,12 @@ class UpdateState extends Equatable {
   final VersionInfo? updateInfo;
   final bool hasCheckedOnStartup;
 
-  const UpdateState({
-    this.updateInfo,
-    this.hasCheckedOnStartup = false,
-  });
+  const UpdateState({this.updateInfo, this.hasCheckedOnStartup = false});
 
   @override
   List<Object?> get props => [updateInfo, hasCheckedOnStartup];
 
-  UpdateState copyWith({
-    VersionInfo? updateInfo,
-    bool? hasCheckedOnStartup,
-  }) {
+  UpdateState copyWith({VersionInfo? updateInfo, bool? hasCheckedOnStartup}) {
     return UpdateState(
       updateInfo: updateInfo ?? this.updateInfo,
       hasCheckedOnStartup: hasCheckedOnStartup ?? this.hasCheckedOnStartup,
@@ -50,7 +44,8 @@ class VersionInfo extends Equatable {
 class UpdateCubit extends Cubit<UpdateState> {
   static const String _owner = 'niuhuan';
   static const String _repo = 'wild';
-  static const String _apiUrl = 'https://api.github.com/repos/$_owner/$_repo/releases/latest';
+  static const String _apiUrl =
+      'https://api.github.com/repos/$_owner/$_repo/releases/latest';
 
   UpdateCubit() : super(const UpdateState());
 
@@ -72,9 +67,7 @@ class UpdateCubit extends Cubit<UpdateState> {
     try {
       final response = await http.get(
         Uri.parse(_apiUrl),
-        headers: {
-          'User-Agent': 'Wild/${AppInfo.fullVersion}',
-        },
+        headers: {'User-Agent': 'Wild/${AppInfo.fullVersion}'},
       );
 
       if (kDebugMode) {
@@ -96,9 +89,10 @@ class UpdateCubit extends Cubit<UpdateState> {
 
         // 移除 'v' 前缀后比较版本号
         if (_compareVersions(
-          latestVersion.substring(1),
-          currentVersion.substring(1),
-        ) > 0) {
+              latestVersion.substring(1),
+              currentVersion.substring(1),
+            ) >
+            0) {
           if (kDebugMode) {
             print('New version available: $latestVersion');
           }
@@ -107,10 +101,7 @@ class UpdateCubit extends Cubit<UpdateState> {
             url: data['html_url'] as String,
             body: data['body'] as String,
           );
-          emit(state.copyWith(
-            updateInfo: info,
-            hasCheckedOnStartup: true,
-          ));
+          emit(state.copyWith(updateInfo: info, hasCheckedOnStartup: true));
           return info;
         } else {
           if (kDebugMode) {
@@ -144,4 +135,4 @@ class UpdateCubit extends Cubit<UpdateState> {
 
     return v1Parts.length.compareTo(v2Parts.length);
   }
-} 
+}

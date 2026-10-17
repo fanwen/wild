@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wild/pages/auth_cubit.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -45,16 +46,16 @@ class _LoginPageState extends State<LoginPage> {
       context: context,
       builder:
           (context) => AlertDialog(
-            title: const Text('注册提示'),
-            content: const Text('注册需要在网页端进行，是否跳转到注册页面？'),
+            title: Text(l10n('注册提示')),
+            content: Text(l10n('注册需要在网页端进行，是否跳转到注册页面？')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('取消'),
+                child: Text(l10n('取消')),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('确定'),
+                child: Text(l10n('确定')),
               ),
             ],
           ),
@@ -66,7 +67,7 @@ class _LoginPageState extends State<LoginPage> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('无法打开注册页面')));
+          ).showSnackBar(SnackBar(content: Text(l10n('无法打开注册页面'))));
         }
       }
     }
@@ -75,22 +76,22 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('登录轻小说文库')),
+      appBar: AppBar(title: Text(l10n('登录轻小说文库'))),
       body: BlocConsumer<AuthCubit, AuthState>(
         listener: (context, state) {
           if (state.status == AuthStatus.error) {
-            var message = '登录失败，请检查网络连接';
+            var message = l10n('登录失败，请检查网络连接');
             var err = state.errorMessage ?? "";
             if (err.contains("用户不存在") || err.contains("用戶不存在")) {
-              message = "用户不存在";
+              message = l10n('用户不存在');
             } else if (err.contains("密码错误") || err.contains("密碼錯誤")) {
-              message = "密码错误";
+              message = l10n('密码错误');
             } else if (err.contains("校验码错误") || err.contains("校驗碼錯誤")) {
-              message = "验证码错误";
+              message = l10n('验证码错误');
             } else if (err.contains("用户登录") || err.contains("用戶登錄")) {
-              message = "用户登录";
+              message = l10n('用户登录');
             } else if (err.contains("验证码过期") || err.contains("驗證碼過期")) {
-              message = "验证码过期";
+              message = l10n('验证码过期');
             }
             ScaffoldMessenger.of(
               context,
@@ -121,13 +122,13 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   TextFormField(
                     controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: '用户名',
+                    decoration: InputDecoration(
+                      labelText: l10n('用户名'),
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value?.isEmpty ?? true) {
-                        return '请输入用户名';
+                        return l10n('请输入用户名');
                       }
                       return null;
                     },
@@ -135,14 +136,14 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
-                    decoration: const InputDecoration(
-                      labelText: '密码',
+                    decoration: InputDecoration(
+                      labelText: l10n('密码'),
                       border: OutlineInputBorder(),
                     ),
                     obscureText: true,
                     validator: (value) {
                       if (value?.isEmpty ?? true) {
-                        return '请输入密码';
+                        return l10n('请输入密码');
                       }
                       return null;
                     },
@@ -181,13 +182,13 @@ class _LoginPageState extends State<LoginPage> {
                   Container(height: 20),
                   TextFormField(
                     controller: _checkcodeController,
-                    decoration: const InputDecoration(
-                      labelText: '验证码',
+                    decoration: InputDecoration(
+                      labelText: l10n('验证码'),
                       border: OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value?.isEmpty ?? true) {
-                        return '请输入验证码';
+                        return l10n('请输入验证码');
                       }
                       return null;
                     },
@@ -199,7 +200,7 @@ class _LoginPageState extends State<LoginPage> {
                         flex: 1,
                         child: OutlinedButton(
                           onPressed: _onRegisterPressed,
-                          child: const Text('注册'),
+                          child: Text(l10n('注册')),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -213,7 +214,7 @@ class _LoginPageState extends State<LoginPage> {
                           child:
                               state.status == AuthStatus.loading
                                   ? const CircularProgressIndicator()
-                                  : const Text('登录'),
+                                  : Text(l10n('登录')),
                         ),
                       ),
                     ],

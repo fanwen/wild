@@ -1,3 +1,4 @@
+import 'package:wild/l10n/ui_language.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -9,8 +10,16 @@ import 'package:wild/src/rust/wenku8/models.dart';
 /// WebView 永久存活，CF clearance 一次建立後可重複使用。
 class CfBookshelfLoader extends StatefulWidget {
   final String apiHost;
-  final void Function(List<Bookcase> bookcases, Map<String, BookcaseDto> contents)? onPartialData;
-  final void Function(List<Bookcase> bookcases, Map<String, BookcaseDto> contents) onSuccess;
+  final void Function(
+    List<Bookcase> bookcases,
+    Map<String, BookcaseDto> contents,
+  )?
+  onPartialData;
+  final void Function(
+    List<Bookcase> bookcases,
+    Map<String, BookcaseDto> contents,
+  )
+  onSuccess;
   final void Function(String error) onError;
 
   const CfBookshelfLoader({
@@ -86,14 +95,18 @@ class CfBookshelfLoaderState extends State<CfBookshelfLoader> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: _onPageFinished,
-        onWebResourceError: (err) {
-          if (_active) widget.onError('WebView 載入失敗: ${err.description}');
-        },
-      ));
+    _controller =
+        WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setNavigationDelegate(
+            NavigationDelegate(
+              onPageFinished: _onPageFinished,
+              onWebResourceError: (err) {
+                if (_active)
+                  widget.onError('${l10n('WebView 载入失败: ')}${err.description}');
+              },
+            ),
+          );
     // 預熱：靜默載入首頁，提前取得 CF clearance
     _controller.loadRequest(Uri.parse('${widget.apiHost}/'));
   }
@@ -116,9 +129,9 @@ class CfBookshelfLoaderState extends State<CfBookshelfLoader> {
     if (!_cookiesInjected) {
       await _injectCookies();
     }
-    await _controller.loadRequest(Uri.parse(
-      '${widget.apiHost}/modules/article/bookcase.php',
-    ));
+    await _controller.loadRequest(
+      Uri.parse('${widget.apiHost}/modules/article/bookcase.php'),
+    );
   }
 
   Future<void> _injectCookies() async {
@@ -151,7 +164,7 @@ class CfBookshelfLoaderState extends State<CfBookshelfLoader> {
         '? "yes" : "no"',
       );
       if (blocked.toString().contains('yes')) {
-        if (_active) widget.onError('IP 被 Cloudflare 封鎖，請嘗試更換網路或使用 VPN');
+        if (_active) widget.onError(l10n('IP 被 Cloudflare 封锁，请尝试更换网络或使用 VPN'));
         _active = false;
         return;
       }
@@ -192,10 +205,13 @@ class CfBookshelfLoaderState extends State<CfBookshelfLoader> {
 
   Future<void> _loadBookcaseList() async {
     try {
-      final raw = await _controller.runJavaScriptReturningResult(_jsGetBookcases);
+      final raw = await _controller.runJavaScriptReturningResult(
+        _jsGetBookcases,
+      );
       final json = _stripJsonString(raw.toString());
       final list = jsonDecode(json) as List;
-      _bookcases = list.map((e) => Bookcase(id: e['id'], title: e['title'])).toList();
+      _bookcases =
+          list.map((e) => Bookcase(id: e['id'], title: e['title'])).toList();
       if (_bookcases.isEmpty) {
         _active = false;
         widget.onSuccess([], {});
@@ -203,7 +219,7 @@ class CfBookshelfLoaderState extends State<CfBookshelfLoader> {
       }
       await _extractBooksAndContinue(_bookcases[0].id);
     } catch (e) {
-      if (_active) widget.onError('解析書架分類失敗: $e');
+      if (_active) widget.onError('${l10n('解析书架分类失败: ')}$e');
     }
   }
 
@@ -217,34 +233,44 @@ class CfBookshelfLoaderState extends State<CfBookshelfLoader> {
       final raw = await _controller.runJavaScriptReturningResult(_jsGetBooks);
       final json = _stripJsonString(raw.toString());
       final data = jsonDecode(json) as Map;
-      final items = (data['items'] as List).map((e) => BookcaseItem(
-        aid: e['aid'] ?? '',
-        bid: e['bid'] ?? '',
-        title: e['title'] ?? '',
-        author: e['author'] ?? '',
-        cid: e['cid'] ?? '',
-        chapterName: e['chapterName'] ?? '',
-      )).toList();
+      final items =
+          (data['items'] as List)
+              .map(
+                (e) => BookcaseItem(
+                  aid: e['aid'] ?? '',
+                  bid: e['bid'] ?? '',
+                  title: e['title'] ?? '',
+                  author: e['author'] ?? '',
+                  cid: e['cid'] ?? '',
+                  chapterName: e['chapterName'] ?? '',
+                ),
+              )
+              .toList();
       _contents[caseId] = BookcaseDto(items: items, tip: data['tip'] ?? '');
 
       // 每個分類載好就即時回呼
       widget.onPartialData?.call(List.from(_bookcases), Map.from(_contents));
 
-      final pending = _bookcases
-          .map((b) => b.id)
-          .where((id) => id != _bookcases[0].id && !_contents.containsKey(id))
-          .toList();
+      final pending =
+          _bookcases
+              .map((b) => b.id)
+              .where(
+                (id) => id != _bookcases[0].id && !_contents.containsKey(id),
+              )
+              .toList();
 
       if (pending.isEmpty) {
         _active = false;
         widget.onSuccess(List.from(_bookcases), Map.from(_contents));
       } else {
-        await _controller.loadRequest(Uri.parse(
-          '${widget.apiHost}/modules/article/bookcase.php?classid=${pending.first}',
-        ));
+        await _controller.loadRequest(
+          Uri.parse(
+            '${widget.apiHost}/modules/article/bookcase.php?classid=${pending.first}',
+          ),
+        );
       }
     } catch (e) {
-      if (_active) widget.onError('解析書本列表失敗: $e');
+      if (_active) widget.onError('${l10n('解析书本列表失败: ')}$e');
     }
   }
 

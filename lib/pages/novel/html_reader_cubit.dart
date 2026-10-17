@@ -1,7 +1,10 @@
+import 'package:wild/l10n/ui_language.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../../src/rust/wenku8/models.dart';
 import '../../src/rust/api/wenku8.dart' as w8;
+import 'reader_markers.dart';
+import 'package:wild/l10n/content_language.dart';
 
 // 状态基类
 abstract class HtmlReaderState extends Equatable {
@@ -86,10 +89,20 @@ class HtmlReaderLoaded extends HtmlReaderState {
   }
 
   @override
-  List<Object?> get props => [aid, cid, title, rawContent, parsedContent, volumes];
+  List<Object?> get props => [
+    aid,
+    cid,
+    title,
+    rawContent,
+    parsedContent,
+    volumes,
+  ];
 }
 
 class HtmlReaderCubit extends Cubit<HtmlReaderState> {
+  /// 本次加载正文时用的字形（内容语言设置变了就要重读）
+  ContentScript? loadedScript;
+
   final NovelInfo novelInfo;
   final String initialAid;
   final String initialCid;
@@ -117,9 +130,9 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
     final volume = _findVolume(aid, cid);
     await w8.updateHistory(
       novelId: aid,
-      novelName: novelInfo.title,
+      novelName: cv(novelInfo.title),
       volumeId: volume.id,
-      volumeName: volume.title,
+      volumeName: cv(volume.title),
       chapterId: cid,
       chapterTitle: title,
       progress: 0,
@@ -136,36 +149,11 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
     for (var paragraph in paragraphs) {
       if (paragraph.trim().isEmpty) continue;
 
-      // 检查是否包含图片标签
-      RegExp regex = RegExp("\<\!\-\-image\-\-\>([^\<]+)\<\!\-\-image\-\-\>");
-      if (regex.hasMatch(paragraph)) {
-        var currentText = paragraph;
-        while (regex.hasMatch(currentText)) {
-          var match = regex.firstMatch(currentText)!;
-
-          // 处理图片前的文本
-          if (match.start > 0) {
-            var text = currentText.substring(0, match.start).trim();
-            if (text.isNotEmpty) {
-              parsedContent.add(ParsedText(text));
-            }
-          }
-
-          // 处理图片
-          final imageUrl = match.group(1)!;
-          parsedContent.add(ParsedImage(imageUrl));
-
-          // 更新剩余文本
-          currentText = currentText.substring(match.end);
-        }
-
-        // 处理最后剩余的文本
-        if (currentText.trim().isNotEmpty) {
-          parsedContent.add(ParsedText(currentText.trim()));
-        }
-      } else {
-        // 普通文本段落
-        parsedContent.add(ParsedText(paragraph));
+      // 一行可能含一或多张插图（<!--image-->地址<!--image-->），按顺序切成文字/插图片段
+      for (final part in splitImageMarkers(paragraph)) {
+        parsedContent.add(
+          part.isImage ? ParsedImage(part.imageUrl!) : ParsedText(part.text!),
+        );
       }
     }
 
@@ -175,6 +163,8 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
   Future<void> loadChapter({String? aid, String? cid}) async {
     try {
       emit(const HtmlReaderLoading());
+      // 记下本次用的字形，构建时发现设置变了会重读
+      loadedScript = contentScriptNow;
       final targetAid = aid ?? initialAid;
       final targetCid = cid ?? initialCid;
 
@@ -183,7 +173,7 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
       for (var volume in initialVolumes) {
         for (var chapter in volume.chapters) {
           if (chapter.aid == targetAid && chapter.cid == targetCid) {
-            chapterTitle = chapter.title;
+            chapterTitle = cv(chapter.title);
             break;
           }
         }
@@ -191,25 +181,29 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
       }
 
       if (chapterTitle == null) {
-        emit(const HtmlReaderError('章节不存在'));
+        emit(HtmlReaderError(l10n('章节不存在')));
         return;
       }
 
       // 加载章节内容
-      final rawContent = await w8.chapterContent(aid: targetAid, cid: targetCid);
+      final rawContent = cv(
+        await w8.chapterContent(aid: targetAid, cid: targetCid),
+      );
       final parsedContent = _parseContent(rawContent);
-      
+
       // 更新阅读历史
       await _updateHistory(targetAid, targetCid, chapterTitle);
 
-      emit(HtmlReaderLoaded(
-        aid: targetAid,
-        cid: targetCid,
-        title: chapterTitle,
-        rawContent: rawContent,
-        parsedContent: parsedContent,
-        volumes: initialVolumes,
-      ));
+      emit(
+        HtmlReaderLoaded(
+          aid: targetAid,
+          cid: targetCid,
+          title: chapterTitle,
+          rawContent: rawContent,
+          parsedContent: parsedContent,
+          volumes: initialVolumes,
+        ),
+      );
     } catch (e) {
       emit(HtmlReaderError(e.toString()));
     }
@@ -226,7 +220,8 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
       final volume = currentState.volumes[i];
       for (var j = 0; j < volume.chapters.length; j++) {
         final chapter = volume.chapters[j];
-        if (chapter.aid == currentState.aid && chapter.cid == currentState.cid) {
+        if (chapter.aid == currentState.aid &&
+            chapter.cid == currentState.cid) {
           currentVolumeIndex = i;
           currentChapterIndex = j;
           break;
@@ -240,14 +235,19 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
     // 尝试获取下一章
     String? nextAid;
     String? nextCid;
-    if (currentChapterIndex < currentState.volumes[currentVolumeIndex].chapters.length - 1) {
+    if (currentChapterIndex <
+        currentState.volumes[currentVolumeIndex].chapters.length - 1) {
       // 当前卷的下一章
-      final nextChapter = currentState.volumes[currentVolumeIndex].chapters[currentChapterIndex + 1];
+      final nextChapter =
+          currentState
+              .volumes[currentVolumeIndex]
+              .chapters[currentChapterIndex + 1];
       nextAid = nextChapter.aid;
       nextCid = nextChapter.cid;
     } else if (currentVolumeIndex < currentState.volumes.length - 1) {
       // 下一卷的第一章
-      final nextChapter = currentState.volumes[currentVolumeIndex + 1].chapters[0];
+      final nextChapter =
+          currentState.volumes[currentVolumeIndex + 1].chapters[0];
       nextAid = nextChapter.aid;
       nextCid = nextChapter.cid;
     }
@@ -268,7 +268,8 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
       final volume = currentState.volumes[i];
       for (var j = 0; j < volume.chapters.length; j++) {
         final chapter = volume.chapters[j];
-        if (chapter.aid == currentState.aid && chapter.cid == currentState.cid) {
+        if (chapter.aid == currentState.aid &&
+            chapter.cid == currentState.cid) {
           currentVolumeIndex = i;
           currentChapterIndex = j;
           break;
@@ -284,7 +285,10 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
     String? prevCid;
     if (currentChapterIndex > 0) {
       // 当前卷的上一章
-      final prevChapter = currentState.volumes[currentVolumeIndex].chapters[currentChapterIndex - 1];
+      final prevChapter =
+          currentState
+              .volumes[currentVolumeIndex]
+              .chapters[currentChapterIndex - 1];
       prevAid = prevChapter.aid;
       prevCid = prevChapter.cid;
     } else if (currentVolumeIndex > 0) {
@@ -299,4 +303,4 @@ class HtmlReaderCubit extends Cubit<HtmlReaderState> {
       await loadChapter(aid: prevAid, cid: prevCid);
     }
   }
-} 
+}

@@ -5,19 +5,26 @@ import 'package:flutter/rendering.dart';
 import 'package:wild/pages/novel/line_height_cubit.dart';
 import 'package:wild/src/rust/api/wenku8.dart';
 import 'package:wild/pages/novel/font_size_cubit.dart';
+import 'package:wild/pages/novel/font_family_cubit.dart';
 import 'package:wild/pages/novel/paragraph_spacing_cubit.dart';
 import '../../src/rust/wenku8/models.dart';
 import 'package:wild/pages/novel/top_bar_height_cubit.dart';
 import 'package:wild/pages/novel/bottom_bar_height_cubit.dart';
 import 'package:wild/pages/novel/left_padding_cubit.dart';
 import 'package:wild/pages/novel/right_padding_cubit.dart';
+import 'package:wild/pages/novel/reader_markers.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class ReaderCubit extends Cubit<ReaderState> {
+  /// 本次加载正文时用的字形（内容语言设置变了就要重读）
+  ContentScript? loadedScript;
+
   final NovelInfo novelInfo;
   String initialAid;
   String initialCid;
   final List<Volume> initialVolumes;
   final FontSizeCubit fontSizeCubit;
+  final FontFamilyCubit fontFamilyCubit;
   final ParagraphSpacingCubit paragraphSpacingCubit;
   final LineHeightCubit lineHeightCubit;
   final TopBarHeightCubit topBarHeightCubit;
@@ -31,6 +38,7 @@ class ReaderCubit extends Cubit<ReaderState> {
     required this.initialCid,
     required this.initialVolumes,
     required this.fontSizeCubit,
+    required this.fontFamilyCubit,
     required this.paragraphSpacingCubit,
     required this.lineHeightCubit,
     required this.topBarHeightCubit,
@@ -43,7 +51,7 @@ class ReaderCubit extends Cubit<ReaderState> {
     for (final volume in initialVolumes) {
       for (final chapter in volume.chapters) {
         if (chapter.aid == aid && chapter.cid == cid) {
-          return chapter.title;
+          return cv(chapter.title);
         }
       }
     }
@@ -64,6 +72,8 @@ class ReaderCubit extends Cubit<ReaderState> {
   Future<void> loadChapter({String? aid, String? cid, int? initialPage}) async {
     try {
       emit(ReaderLoading(super.state.showControls));
+      // 记下本次用的字形，构建时发现设置变了会重读
+      loadedScript = contentScriptNow;
       initialAid = aid ?? initialAid;
       initialCid = cid ?? initialCid;
 
@@ -72,9 +82,13 @@ class ReaderCubit extends Cubit<ReaderState> {
 
       final chapterTitle = _findChapterTitle(targetAid, targetCid);
       final volume = _findVolume(targetAid, targetCid);
-      final content = await chapterContent(aid: targetAid, cid: targetCid);
+      final content = cv(await chapterContent(aid: targetAid, cid: targetCid));
+
+      // 字体必须先注册好再量高度，否则分页与渲染用的字形宽度不一致
+      await fontFamilyCubit.ready;
 
       final fontSize = fontSizeCubit.state;
+      final fontFamily = fontFamilyCubit.state.family;
       final paragraphSpacing = paragraphSpacingCubit.state;
       final lineHeight = lineHeightCubit.state;
 
@@ -85,6 +99,7 @@ class ReaderCubit extends Cubit<ReaderState> {
         chapterTitle,
         content,
         fontSize,
+        fontFamily,
         paragraphSpacing,
         lineHeight,
       );
@@ -99,11 +114,11 @@ class ReaderCubit extends Cubit<ReaderState> {
 
       // 计算从第一页到当前页的累计字数
       final characterCount = _calculateCharacterCountUpToPage(pages, pageIndex);
-      
+
       // 更新阅读历史
       await updateHistory(
         novelId: targetAid,
-        novelName: novelInfo.title,
+        novelName: cv(novelInfo.title),
         volumeId: volume.id,
         volumeName: volume.title,
         chapterId: targetCid,
@@ -111,7 +126,7 @@ class ReaderCubit extends Cubit<ReaderState> {
         progress: characterCount,
         progressPage: pageIndex,
         cover: novelInfo.imgUrl,
-        author: novelInfo.author,
+        author: cv(novelInfo.author),
       );
 
       emit(
@@ -142,9 +157,13 @@ class ReaderCubit extends Cubit<ReaderState> {
       final targetCid = initialCid;
 
       final chapterTitle = _findChapterTitle(targetAid, targetCid);
-      final content = await chapterContent(aid: targetAid, cid: targetCid);
+      final content = cv(await chapterContent(aid: targetAid, cid: targetCid));
+
+      // 字体必须先注册好再量高度，否则分页与渲染用的字形宽度不一致
+      await fontFamilyCubit.ready;
 
       final fontSize = fontSizeCubit.state;
+      final fontFamily = fontFamilyCubit.state.family;
       final paragraphSpacing = paragraphSpacingCubit.state;
       final lineHeight = lineHeightCubit.state;
 
@@ -154,6 +173,7 @@ class ReaderCubit extends Cubit<ReaderState> {
         chapterTitle,
         content,
         fontSize,
+        fontFamily,
         paragraphSpacing,
         lineHeight,
       );
@@ -182,14 +202,17 @@ class ReaderCubit extends Cubit<ReaderState> {
     if (state is ReaderLoaded) {
       final currentState = state as ReaderLoaded;
       emit(currentState.copyWith(currentPageIndex: index));
-      
+
       // 计算从第一页到当前页的累计字数
-      final characterCount = _calculateCharacterCountUpToPage(currentState.pages, index);
-      
+      final characterCount = _calculateCharacterCountUpToPage(
+        currentState.pages,
+        index,
+      );
+
       // 更新阅读历史中的页码
       updateHistory(
         novelId: currentState.aid,
-        novelName: novelInfo.title,
+        novelName: cv(novelInfo.title),
         volumeId: _findVolume(currentState.aid, currentState.cid).id,
         volumeName: _findVolume(currentState.aid, currentState.cid).title,
         chapterId: currentState.cid,
@@ -197,7 +220,7 @@ class ReaderCubit extends Cubit<ReaderState> {
         progress: characterCount,
         progressPage: index,
         cover: novelInfo.imgUrl,
-        author: novelInfo.author,
+        author: cv(novelInfo.author),
       );
     }
   }
@@ -213,7 +236,8 @@ class ReaderCubit extends Cubit<ReaderState> {
     if (currentChapterIndex > 0) {
       // 同一卷的上一章
       volume = initialVolumes[currentVolumeIndex];
-      chapter = initialVolumes[currentVolumeIndex].chapters[currentChapterIndex - 1];
+      chapter =
+          initialVolumes[currentVolumeIndex].chapters[currentChapterIndex - 1];
       await loadChapter(aid: chapter.aid, cid: chapter.cid, initialPage: 0);
     } else if (currentVolumeIndex > 0) {
       // 上一卷的最后一章
@@ -234,10 +258,12 @@ class ReaderCubit extends Cubit<ReaderState> {
 
     Volume volume;
     Chapter chapter;
-    if (currentChapterIndex < initialVolumes[currentVolumeIndex].chapters.length - 1) {
+    if (currentChapterIndex <
+        initialVolumes[currentVolumeIndex].chapters.length - 1) {
       // 同一卷的下一章
       volume = initialVolumes[currentVolumeIndex];
-      chapter = initialVolumes[currentVolumeIndex].chapters[currentChapterIndex + 1];
+      chapter =
+          initialVolumes[currentVolumeIndex].chapters[currentChapterIndex + 1];
       await loadChapter(aid: chapter.aid, cid: chapter.cid, initialPage: 0);
     } else if (currentVolumeIndex < initialVolumes.length - 1) {
       // 下一卷的第一章
@@ -310,6 +336,7 @@ class ReaderCubit extends Cubit<ReaderState> {
     String title,
     String content,
     double fontSize,
+    String fontFamily,
     double paragraphSpacing,
     double lineHeight,
   ) {
@@ -320,9 +347,11 @@ class ReaderCubit extends Cubit<ReaderState> {
     final screenHeight =
         MediaQueryData.fromView(WidgetsBinding.instance.window).size.height;
     final topPadding =
-        MediaQueryData.fromView(WidgetsBinding.instance.window).padding.top;
+        MediaQueryData.fromView(WidgetsBinding.instance.window).viewPadding.top;
     final bottomPadding =
-        MediaQueryData.fromView(WidgetsBinding.instance.window).padding.bottom;
+        MediaQueryData.fromView(
+          WidgetsBinding.instance.window,
+        ).viewPadding.bottom;
     final topBarHeight = topBarHeightCubit.state;
     final bottomBarHeight = bottomBarHeightCubit.state;
     final leftPadding = leftPaddingCubit.state;
@@ -348,6 +377,7 @@ class ReaderCubit extends Cubit<ReaderState> {
         textPainter.strutStyle = StrutStyle(height: lineHeight);
         final textStyle = TextStyle(
           fontSize: fontSize,
+          fontFamily: fontFamily.isEmpty ? null : fontFamily,
           height: lineHeight,
           letterSpacing: 0.5,
         );
@@ -392,25 +422,13 @@ class ReaderCubit extends Cubit<ReaderState> {
     }
 
     for (var paragraph in paragraphs) {
-      RegExp regex = RegExp("\<\!\-\-image\-\-\>([^\<]+)\<\!\-\-image\-\-\>");
-      if (regex.hasMatch(paragraph)) {
-        while (regex.hasMatch(paragraph)) {
-          var match = regex.firstMatch(paragraph)!;
-          if (match.start > 0) {
-            var per = paragraph.substring(0, match.start).trim();
-            if (per.isNotEmpty) {
-              putParagraph(per);
-            }
-            putImage(match.group(1)!);
-            paragraph = paragraph.substring(match.end);
-          }
+      // 一行可能含一或多张插图（<!--image-->地址<!--image-->），按顺序切成文字/插图片段
+      for (final part in splitImageMarkers(paragraph)) {
+        if (part.isImage) {
+          putImage(part.imageUrl!);
+        } else {
+          putParagraph(part.text!);
         }
-        paragraph = paragraph.trim();
-        if (paragraph.isNotEmpty) {
-          putParagraph(paragraph);
-        }
-      } else {
-        putParagraph(paragraph);
       }
     }
 

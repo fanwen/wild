@@ -136,6 +136,25 @@ pub(crate) async fn cleanup_expired_chapters() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 正文抽取格式版本：Rust 侧改动 chapter_content 的格式（例如新增 <!--image--> 插图标记）后 +1。
+/// 启动时发现版本不一致就清空章节缓存，否则老缓存里没有插图，用户要等缓存过期才看得到。
+const CHAPTER_CONTENT_FORMAT_KEY: &str = "chapter_content_format";
+const CHAPTER_CONTENT_FORMAT_VERSION: &str = "2";
+
+pub(crate) async fn migrate_chapter_content_format() -> anyhow::Result<()> {
+    let saved = crate::api::database::load_property(CHAPTER_CONTENT_FORMAT_KEY.to_string()).await?;
+    if saved == CHAPTER_CONTENT_FORMAT_VERSION {
+        return Ok(());
+    }
+    chapter_cache::Entity::delete_all().await?;
+    crate::api::database::save_property(
+        CHAPTER_CONTENT_FORMAT_KEY.to_string(),
+        CHAPTER_CONTENT_FORMAT_VERSION.to_string(),
+    )
+    .await?;
+    Ok(())
+}
+
 // 清理过期的web缓存
 pub(crate) async fn cleanup_expired_web_cache() -> anyhow::Result<()> {
     // 清理7天前的缓存

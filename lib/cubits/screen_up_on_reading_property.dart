@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import '../src/rust/api/database.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 const key = "_screenUpOnReadingProperty";
 var _screenUpOnReadingProperty = false;
@@ -23,7 +24,7 @@ Widget screenUpOnReadingSetting() {
     return StatefulBuilder(
       builder: (BuildContext context, void Function(void Function()) setState) {
         return SwitchListTile(
-          title: Text("打开阅读器时保持亮屏"),
+          title: Text(l10n("打开阅读器时保持亮屏")),
           value: _screenUpOnReadingProperty,
           onChanged: (v) {
             setState(() {

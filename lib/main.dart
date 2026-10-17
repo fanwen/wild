@@ -11,6 +11,7 @@ import 'package:wild/pages/novel/novel_downloading_page.dart';
 import 'package:wild/pages/novel/reader_page.dart';
 import 'package:wild/pages/novel/html_reader_page.dart';
 import 'package:wild/pages/novel/font_size_cubit.dart';
+import 'package:wild/pages/novel/font_family_cubit.dart';
 import 'package:wild/pages/novel/paragraph_spacing_cubit.dart';
 import 'package:wild/pages/novel/theme_cubit.dart';
 import 'package:wild/pages/novel/reader_type_cubit.dart';
@@ -34,6 +35,11 @@ import 'package:wild/pages/novel/reviews_page.dart';
 import 'package:wild/cubits/api_host_cubit.dart';
 import 'package:wild/cubits/reader_background_cubit.dart';
 import 'package:wild/cubits/volume_control_cubit.dart';
+import 'package:wild/cubits/ui_locale_cubit.dart';
+import 'package:wild/cubits/content_language_cubit.dart';
+import 'package:wild/l10n/content_language.dart';
+import 'package:wild/l10n/ui_language.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 final lightTheme = ThemeData(
   colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
@@ -48,7 +54,7 @@ final darkTheme = ThemeData(
 );
 
 Future<void> main() async {
-  HttpOverrides.global = _LoggingHttpOverrides();  // ← 新增這行
+  HttpOverrides.global = _LoggingHttpOverrides(); // ← 新增這行
   WidgetsFlutterBinding.ensureInitialized();
   await AppInfo.init();
   await RustLib.init();
@@ -66,6 +72,10 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => BookshelfCubit()..loadBookcases()),
         BlocProvider(create: (context) => ThemeCubit()),
         BlocProvider(create: (context) => FontSizeCubit()),
+        BlocProvider(create: (context) => FontFamilyCubit()),
+        BlocProvider(create: (context) => UiFontFamilyCubit()),
+        BlocProvider(create: (context) => UiLocaleCubit()),
+        BlocProvider(create: (context) => ContentLanguageCubit()),
         BlocProvider(create: (context) => LineHeightCubit()),
         BlocProvider(create: (context) => ParagraphSpacingCubit()),
         BlocProvider(create: (context) => TopBarHeightCubit()),
@@ -90,106 +100,166 @@ class YourApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<ThemeCubit, ReaderTheme>(
       builder: (context, theme) {
-        return MaterialApp(
-          title: '轻小说文库',
-          theme:
-              theme.themeMode == ReaderThemeMode.dark ? darkTheme : lightTheme,
-          darkTheme:
-              theme.themeMode == ReaderThemeMode.light ? lightTheme : darkTheme,
-          initialRoute: '/init',
-          routes: {
-            '/init': (context) => const InitPage(),
-            '/login': (context) => const UpdateChecker(child: LoginPage()),
-            '/home': (context) => const UpdateChecker(child: HomePage()),
-            '/novel/info': (context) {
-              final args = ModalRoute.of(context)!.settings.arguments;
-              if (args is Map<String, dynamic>) {
-                return NovelInfoPage(novelId: args['novelId'] as String);
-              }
-              return NovelInfoPage(novelId: args as String);
-            },
-            '/novel/reviews': (context) {
-              final args = ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
-              return ReviewsPage(
-                aid: args['aid'] as String,
-                title: args['title'] as String,
-              );
-            },
-            '/novel/downloading': (context) {
-              final args =
-                  ModalRoute.of(context)!.settings.arguments
-                      as Map<String, dynamic>;
-              return NovelDownloadingPage(
-                novelId: args['novelId'] as String,
-                existsDownload: args['existsDownload'],
-                novelInfo: args['novelInfo'] as NovelInfo,
-                volumes: (args['volumes'] as List).cast<Volume>(),
-              );
-            },
-            '/novel/reader': (context) {
-              final args =
-                  ModalRoute.of(context)!.settings.arguments
-                      as Map<String, dynamic>;
-              final readerType = context.read<ReaderTypeCubit>().state;
-
-              if (readerType == ReaderType.html) {
-                return HtmlReaderPage(
-                  novelInfo: args['novelInfo'] as NovelInfo,
-                  initialAid: args['novelId'] as String,
-                  initialCid: args['chapterId'] as String,
-                  volumes: (args['volumes'] as List).cast<Volume>(),
-                );
-              } else {
-                return MultiBlocProvider(
-                  providers: [
-                    BlocProvider.value(value: context.read<FontSizeCubit>()),
-                    BlocProvider.value(
-                      value: context.read<ParagraphSpacingCubit>(),
-                    ),
-                    BlocProvider.value(value: context.read<LineHeightCubit>()),
-                    BlocProvider.value(value: context.read<ThemeCubit>()),
-                    BlocProvider.value(
-                      value: context.read<TopBarHeightCubit>(),
-                    ),
-                    BlocProvider.value(
-                      value: context.read<BottomBarHeightCubit>(),
-                    ),
-                  ],
-                  child: ReaderPage(
-                    aid: args['novelId'] as String,
-                    cid: args['chapterId'] as String,
-                    initialTitle: args['title'] as String,
-                    volumes: (args['volumes'] as List).cast<Volume>(),
-                    novelInfo: args['novelInfo'] as NovelInfo,
-                    initialPage: args['initialPage'] as int?,
+        // 界面字体独立于阅读正文的字体：套在主题上，整个 app 的文字都跟着换
+        return BlocBuilder<UiFontFamilyCubit, ReaderFont>(
+          builder: (context, uiFont) {
+            return BlocBuilder<UiLocaleCubit, UiLanguage>(
+              builder: (context, uiLanguage) {
+                // 界面语言：跟随系统 / 繁體 / 简体。构建前把「当前是否繁体」告诉 l10n()
+                setUiTraditional(
+                  useTraditionalOf(
+                    uiLanguage,
+                    WidgetsBinding.instance.platformDispatcher.locale,
                   ),
                 );
-              }
-            },
-            '/category': (context) {
-              final args = ModalRoute.of(context)!.settings.arguments;
-              if (args is Map<String, dynamic> && args.containsKey('tag')) {
-                return Scaffold(
-                  appBar: AppBar(title: Text("分类")),
-                  body: CategoryPage(initialTag: args['tag'] as String),
+                return BlocBuilder<ContentLanguageCubit, ContentLanguage>(
+                  builder: (context, contentLanguage) {
+                    // 内容（正文/书名/简介/章节名）要不要转繁体：跟随界面语言 / 强制繁 / 强制简
+                    setContentTraditional(
+                      contentIsTraditional(contentLanguage),
+                    );
+                    return MaterialApp(
+                      locale: materialLocaleOf(uiLanguage),
+                      supportedLocales: kSupportedLocales,
+                      localizationsDelegates: const [
+                        GlobalMaterialLocalizations.delegate,
+                        GlobalWidgetsLocalizations.delegate,
+                        GlobalCupertinoLocalizations.delegate,
+                      ],
+                      title: l10n('轻小说文库'),
+                      theme: applyUiFontToTheme(
+                        theme.themeMode == ReaderThemeMode.dark
+                            ? darkTheme
+                            : lightTheme,
+                        uiFont,
+                      ),
+                      darkTheme: applyUiFontToTheme(
+                        theme.themeMode == ReaderThemeMode.light
+                            ? lightTheme
+                            : darkTheme,
+                        uiFont,
+                      ),
+                      initialRoute: '/init',
+                      routes: {
+                        '/init': (context) => const InitPage(),
+                        '/login':
+                            (context) =>
+                                const UpdateChecker(child: LoginPage()),
+                        '/home':
+                            (context) => const UpdateChecker(child: HomePage()),
+                        '/novel/info': (context) {
+                          final args =
+                              ModalRoute.of(context)!.settings.arguments;
+                          if (args is Map<String, dynamic>) {
+                            return NovelInfoPage(
+                              novelId: args['novelId'] as String,
+                            );
+                          }
+                          return NovelInfoPage(novelId: args as String);
+                        },
+                        '/novel/reviews': (context) {
+                          final args =
+                              ModalRoute.of(context)!.settings.arguments
+                                  as Map<String, dynamic>;
+                          return ReviewsPage(
+                            aid: args['aid'] as String,
+                            title: args['title'] as String,
+                          );
+                        },
+                        '/novel/downloading': (context) {
+                          final args =
+                              ModalRoute.of(context)!.settings.arguments
+                                  as Map<String, dynamic>;
+                          return NovelDownloadingPage(
+                            novelId: args['novelId'] as String,
+                            existsDownload: args['existsDownload'],
+                            novelInfo: args['novelInfo'] as NovelInfo,
+                            volumes: (args['volumes'] as List).cast<Volume>(),
+                          );
+                        },
+                        '/novel/reader': (context) {
+                          final args =
+                              ModalRoute.of(context)!.settings.arguments
+                                  as Map<String, dynamic>;
+                          final readerType =
+                              context.read<ReaderTypeCubit>().state;
+
+                          if (readerType == ReaderType.html) {
+                            return HtmlReaderPage(
+                              novelInfo: args['novelInfo'] as NovelInfo,
+                              initialAid: args['novelId'] as String,
+                              initialCid: args['chapterId'] as String,
+                              volumes: (args['volumes'] as List).cast<Volume>(),
+                            );
+                          } else {
+                            return MultiBlocProvider(
+                              providers: [
+                                BlocProvider.value(
+                                  value: context.read<FontSizeCubit>(),
+                                ),
+                                BlocProvider.value(
+                                  value: context.read<ParagraphSpacingCubit>(),
+                                ),
+                                BlocProvider.value(
+                                  value: context.read<LineHeightCubit>(),
+                                ),
+                                BlocProvider.value(
+                                  value: context.read<ThemeCubit>(),
+                                ),
+                                BlocProvider.value(
+                                  value: context.read<TopBarHeightCubit>(),
+                                ),
+                                BlocProvider.value(
+                                  value: context.read<BottomBarHeightCubit>(),
+                                ),
+                              ],
+                              child: ReaderPage(
+                                aid: args['novelId'] as String,
+                                cid: args['chapterId'] as String,
+                                initialTitle: args['title'] as String,
+                                volumes:
+                                    (args['volumes'] as List).cast<Volume>(),
+                                novelInfo: args['novelInfo'] as NovelInfo,
+                                initialPage: args['initialPage'] as int?,
+                              ),
+                            );
+                          }
+                        },
+                        '/category': (context) {
+                          final args =
+                              ModalRoute.of(context)!.settings.arguments;
+                          if (args is Map<String, dynamic> &&
+                              args.containsKey('tag')) {
+                            return Scaffold(
+                              appBar: AppBar(title: Text(l10n("分类"))),
+                              body: CategoryPage(
+                                initialTag: args['tag'] as String,
+                              ),
+                            );
+                          }
+                          return const CategoryPage();
+                        },
+                        '/articlelist': (context) => const ArticlelistPage(),
+                        '/recommend': (context) => const RecommendPage(),
+                        '/more': (context) => const MorePage(),
+                        '/search': (context) {
+                          final args =
+                              ModalRoute.of(context)!.settings.arguments;
+                          if (args is Map<String, dynamic>) {
+                            return SearchPage(
+                              initialSearchType: args['searchType'] as String?,
+                              initialSearchKey: args['searchKey'] as String?,
+                            );
+                          }
+                          return const SearchPage();
+                        },
+                        '/about': (context) => const AboutPage(),
+                      },
+                    );
+                  },
                 );
-              }
-              return const CategoryPage();
-            },
-            '/articlelist': (context) => const ArticlelistPage(),
-            '/recommend': (context) => const RecommendPage(),
-            '/more': (context) => const MorePage(),
-            '/search': (context) {
-              final args = ModalRoute.of(context)!.settings.arguments;
-              if (args is Map<String, dynamic>) {
-                return SearchPage(
-                  initialSearchType: args['searchType'] as String?,
-                  initialSearchKey: args['searchKey'] as String?,
-                );
-              }
-              return const SearchPage();
-            },
-            '/about': (context) => const AboutPage(),
+              },
+            );
           },
         );
       },
@@ -243,4 +313,3 @@ class _LoggingHttpClientRequest implements HttpClientRequest {
 
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
-

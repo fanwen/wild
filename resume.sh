@@ -1,0 +1,2 @@
+#!/bin/sh
+hermes --resume local-97e3367100e8a0218695ec9ad452c3e206a45fb344639f4764ef1f44e508048e

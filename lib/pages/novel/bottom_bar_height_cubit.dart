@@ -28,4 +28,4 @@ class BottomBarHeightCubit extends Cubit<double> {
       emit(height);
     }
   }
-} 
+}

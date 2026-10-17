@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wild/pages/auth_cubit.dart';
 import 'package:wild/pages/novel/font_size_cubit.dart';
+import 'package:wild/pages/novel/font_family_cubit.dart';
+import 'package:wild/cubits/ui_locale_cubit.dart';
+import 'package:wild/cubits/content_language_cubit.dart';
 import 'package:wild/pages/novel/paragraph_spacing_cubit.dart';
 import 'package:wild/pages/novel/line_height_cubit.dart';
 import 'package:wild/pages/novel/theme_cubit.dart';
@@ -37,8 +40,15 @@ class _InitPageState extends State<InitPage> {
     }
     await init(root: root);
 
+    // 简繁转换表是 assets，先把表读进来，后面按设置转换内容才有东西查
+    await ContentLanguageCubit.initConverter();
+
     // 初始化所有 Cubit
     final fontSizeCubit = context.read<FontSizeCubit>();
+    final fontFamilyCubit = context.read<FontFamilyCubit>();
+    final uiFontCubit = context.read<UiFontFamilyCubit>();
+    final uiLocaleCubit = context.read<UiLocaleCubit>();
+    final contentLanguageCubit = context.read<ContentLanguageCubit>();
     final paragraphSpacingCubit = context.read<ParagraphSpacingCubit>();
     final lineHeightCubit = context.read<LineHeightCubit>();
     final themeCubit = context.read<ThemeCubit>();
@@ -52,6 +62,10 @@ class _InitPageState extends State<InitPage> {
     // 等待所有 Cubit 初始化完成
     await Future.wait([
       fontSizeCubit.loadFontSize(),
+      fontFamilyCubit.init(root),
+      uiFontCubit.init(root),
+      uiLocaleCubit.loadLanguage(),
+      contentLanguageCubit.load(),
       paragraphSpacingCubit.loadSpacing(),
       lineHeightCubit.loadLineHeight(),
       themeCubit.loadTheme(),
@@ -87,12 +101,13 @@ class _InitPageState extends State<InitPage> {
           builder: (BuildContext context, BoxConstraints constraints) {
             var width = 1080;
             var height = 1920;
-            var min = constraints.maxWidth > constraints.maxHeight 
-                ? constraints.maxHeight 
-                : constraints.maxWidth;
+            var min =
+                constraints.maxWidth > constraints.maxHeight
+                    ? constraints.maxHeight
+                    : constraints.maxWidth;
             var newHeight = min;
             var newWidth = min * (width / height);
-            
+
             return Stack(
               children: [
                 Center(

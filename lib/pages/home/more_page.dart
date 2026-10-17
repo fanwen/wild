@@ -4,6 +4,7 @@ import 'package:wild/pages/home/account_page.dart';
 import 'package:wild/pages/home/settings_page.dart';
 import 'package:wild/pages/update_cubit.dart';
 import 'package:wild/pages/novel/novel_download_page.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 class MorePage extends StatelessWidget {
   const MorePage({super.key});
@@ -13,47 +14,51 @@ class MorePage extends StatelessWidget {
     return BlocBuilder<UpdateCubit, UpdateState>(
       builder: (context, state) {
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('更多'),
-          ),
+          appBar: AppBar(title: Text(l10n('更多'))),
           body: ListView(
             children: [
               ListTile(
                 leading: const Icon(Icons.download_outlined),
-                title: const Text('下载'),
+                title: Text(l10n('下载')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const NovelDownloadPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const NovelDownloadPage(),
+                    ),
                   );
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.person_outline),
-                title: const Text('账户'),
+                title: Text(l10n('账户')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const AccountPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const AccountPage(),
+                    ),
                   );
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.settings_outlined),
-                title: const Text('设置'),
+                title: Text(l10n('设置')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const SettingsPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const SettingsPage(),
+                    ),
                   );
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.info_outline),
-                title: const Text('关于'),
+                title: Text(l10n('关于')),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -69,7 +74,7 @@ class MorePage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '新版本',
+                          l10n('新版本'),
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.onPrimary,
                             fontSize: 12,
@@ -89,4 +94,4 @@ class MorePage extends StatelessWidget {
       },
     );
   }
-} 
+}

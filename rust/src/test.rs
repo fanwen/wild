@@ -157,6 +157,56 @@ async fn test_c_content() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 把章节页的 #content 抽成正文（含插图标记），方便用真实取样页面做离线断言
+fn extract_fixture(html: &str) -> String {
+    let document = scraper::Html::parse_document(html);
+    let selector = scraper::Selector::parse("#content").unwrap();
+    let content = document.select(&selector).next().expect("#content");
+    let mut buf = String::new();
+    Wenku8Client::extract_content_text(content, &mut buf, "https://www.wenku8.net");
+    buf.trim().to_string()
+}
+
+#[test]
+fn test_extract_chapter_illustration_markers() {
+    // 插图章节（取样自 /novel/1/1269/40162.htm）：只剩插图标记，水印 <ul> 要剔除
+    let text = extract_fixture(include_str!("../test_data/chapter_illustration.html"));
+    assert!(!text.contains("轻小说文库"), "水印没剔掉: {text}");
+    let urls: Vec<&str> = text
+        .split('\n')
+        .filter_map(|line| {
+            line.strip_prefix("<!--image-->")
+                .and_then(|rest| rest.strip_suffix("<!--image-->"))
+        })
+        .collect();
+    assert_eq!(
+        urls,
+        vec![
+            "https://pic.777743.xyz/1/1269/40162/48046.jpg",
+            "https://pic.777743.xyz/1/1269/40162/48047.jpg",
+            "https://pic.777743.xyz/1/1269/40162/48048.jpg",
+        ],
+        "插图标记不对: {text}"
+    );
+    // 每张图独占一行（Dart 侧按行切分）
+    assert!(!text.contains("<!--image--><!--image-->"), "两张图挤在一行: {text}");
+}
+
+#[test]
+fn test_extract_chapter_text_with_image() {
+    // 正文章节（取样自 /novel/1/1269/40156.htm）：文字按 <br> 换行 + 中间插一张图
+    let text = extract_fixture(include_str!("../test_data/chapter_text.html"));
+    assert!(text.contains("——很久很久以前。"), "正文丢了: {text}");
+    assert!(text.contains("战争持续了长久一段时间。"), "正文丢了: {text}");
+    assert!(text.contains('\n'), "没有把 <br> 换成换行: {text}");
+    // src 是相对占位符、data-src 是绝对地址 → 取绝对地址
+    assert!(
+        text.contains("<!--image-->https://pic.777743.xyz/1/1269/40156/48099.jpg<!--image-->"),
+        "插图标记不对: {text}"
+    );
+    assert!(!text.contains("<img"), "标签没剔掉: {text}");
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tag_page() -> anyhow::Result<()> {
     init_context().await?;
@@ -172,5 +222,3 @@ async fn test_reviews() -> anyhow::Result<()> {
     println!("response : {}", serde_json::to_string_pretty(&response)?);
     Ok(())
 }
-
-1

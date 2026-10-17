@@ -6,4 +6,4 @@ class AutoScrollCubit extends Cubit<bool> {
   void toggle() => emit(!state);
   void start() => emit(true);
   void stop() => emit(false);
-} 
+}

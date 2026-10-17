@@ -8,16 +8,18 @@ class AutoScrollConfigCubit extends Cubit<AutoScrollConfig> {
   static const String _scrollIntervalKey = 'auto_scroll_interval';
 
   AutoScrollConfigCubit()
-      : super(AutoScrollConfig(
+    : super(
+        AutoScrollConfig(
           scrollSpeed: defaultScrollSpeed,
           scrollInterval: defaultScrollInterval,
-        ));
+        ),
+      );
 
   Future<void> loadConfig() async {
     try {
       final savedSpeed = await loadProperty(key: _scrollSpeedKey);
       final savedInterval = await loadProperty(key: _scrollIntervalKey);
-      
+
       double scrollSpeed = defaultScrollSpeed;
       int scrollInterval = defaultScrollInterval;
 
@@ -28,16 +30,20 @@ class AutoScrollConfigCubit extends Cubit<AutoScrollConfig> {
         scrollInterval = int.parse(savedInterval);
       }
 
-      emit(AutoScrollConfig(
-        scrollSpeed: scrollSpeed,
-        scrollInterval: scrollInterval,
-      ));
+      emit(
+        AutoScrollConfig(
+          scrollSpeed: scrollSpeed,
+          scrollInterval: scrollInterval,
+        ),
+      );
     } catch (e) {
       // 如果加载失败，使用默认值
-      emit(AutoScrollConfig(
-        scrollSpeed: defaultScrollSpeed,
-        scrollInterval: defaultScrollInterval,
-      ));
+      emit(
+        AutoScrollConfig(
+          scrollSpeed: defaultScrollSpeed,
+          scrollInterval: defaultScrollInterval,
+        ),
+      );
     }
   }
 
@@ -71,13 +77,10 @@ class AutoScrollConfig {
     required this.scrollInterval,
   });
 
-  AutoScrollConfig copyWith({
-    double? scrollSpeed,
-    int? scrollInterval,
-  }) {
+  AutoScrollConfig copyWith({double? scrollSpeed, int? scrollInterval}) {
     return AutoScrollConfig(
       scrollSpeed: scrollSpeed ?? this.scrollSpeed,
       scrollInterval: scrollInterval ?? this.scrollInterval,
     );
   }
-} 
+}

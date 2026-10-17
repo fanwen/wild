@@ -105,6 +105,8 @@ pub async fn init(root: String) -> Result<()> {
     cleanup_image_cache().await?;
     cleanup_expired_chapters().await?;
     cleanup_expired_web_cache().await?;
+    // 正文抽取格式升级（例如新增插图标记）后清一次章节缓存
+    migrate_chapter_content_format().await?;
 
     init_user_agent().await?;
     init_api_host().await?;

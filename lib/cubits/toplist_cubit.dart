@@ -64,12 +64,14 @@ class ToplistCubit extends Cubit<ToplistState> {
     if (state is ToplistLoaded) {
       final currentState = state as ToplistLoaded;
       if (currentState.sort != sort) {
-        emit(currentState.copyWith(
-          sort: sort,
-          novels: [],
-          currentPage: 1,
-          hasMore: true,
-        ));
+        emit(
+          currentState.copyWith(
+            sort: sort,
+            novels: [],
+            currentPage: 1,
+            hasMore: true,
+          ),
+        );
         loadNovels(refresh: true);
       }
     }
@@ -79,11 +81,13 @@ class ToplistCubit extends Cubit<ToplistState> {
     if (state is! ToplistLoaded) {
       emit(ToplistLoaded(novels: []));
     } else if (refresh) {
-      emit((state as ToplistLoaded).copyWith(
-        novels: [],
-        currentPage: 1,
-        hasMore: true,
-      ));
+      emit(
+        (state as ToplistLoaded).copyWith(
+          novels: [],
+          currentPage: 1,
+          hasMore: true,
+        ),
+      );
     }
 
     final currentState = state;
@@ -93,37 +97,44 @@ class ToplistCubit extends Cubit<ToplistState> {
 
     try {
       final page = refresh ? 1 : currentState.currentPage;
-      final result = await toplist(
-        sort: currentState.sort,
-        page: page,
-      );
-      final novels = result.records.map((cover) => Novel(
-        id: cover.aid,
-        title: cover.title,
-        author: '', // 需要从 novelInfo 获取
-        coverUrl: cover.img,
-        lastChapter: '', // 需要从 novelInfo 获取
-        tags: [], // 需要从 novelInfo 获取
-      )).toList();
+      final result = await toplist(sort: currentState.sort, page: page);
+      final novels =
+          result.records
+              .map(
+                (cover) => Novel(
+                  id: cover.aid,
+                  title: cover.title,
+                  author: '', // 需要从 novelInfo 获取
+                  coverUrl: cover.img,
+                  lastChapter: '', // 需要从 novelInfo 获取
+                  tags: [], // 需要从 novelInfo 获取
+                ),
+              )
+              .toList();
       final hasMore = novels.isNotEmpty;
 
       if (state is ToplistLoaded) {
         final currentState = state as ToplistLoaded;
-        final updatedNovels = refresh ? novels : [...currentState.novels, ...novels];
-        emit(currentState.copyWith(
-          novels: updatedNovels,
-          currentPage: page + 1,
-          hasMore: hasMore,
-        ));
+        final updatedNovels =
+            refresh ? novels : [...currentState.novels, ...novels];
+        emit(
+          currentState.copyWith(
+            novels: updatedNovels,
+            currentPage: page + 1,
+            hasMore: hasMore,
+          ),
+        );
       } else {
-        emit(ToplistLoaded(
-          novels: novels,
-          currentPage: page + 1,
-          hasMore: hasMore,
-        ));
+        emit(
+          ToplistLoaded(
+            novels: novels,
+            currentPage: page + 1,
+            hasMore: hasMore,
+          ),
+        );
       }
     } catch (e) {
       emit(ToplistError(e.toString()));
     }
   }
-} 
+}

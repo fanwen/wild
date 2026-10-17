@@ -11,10 +11,14 @@ import 'package:wild/widgets/cf_action_loader.dart';
 
 import '../../src/rust/wenku8/models.dart';
 import 'novel_info_cubit.dart';
+import 'package:wild/l10n/ui_language.dart';
+import 'package:wild/l10n/content_language.dart';
 
 bool _isCfError(dynamic e) {
   final msg = e.toString();
-  return msg.contains('403') || msg.contains('Cloudflare') || msg.contains('cf_');
+  return msg.contains('403') ||
+      msg.contains('Cloudflare') ||
+      msg.contains('cf_');
 }
 
 class NovelInfoPage extends StatelessWidget {
@@ -50,7 +54,7 @@ class NovelInfoPage extends StatelessWidget {
         if (!context.mounted) return;
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('获取下载信息失败: $e')));
+        ).showSnackBar(SnackBar(content: Text('${l10n('获取下载信息失败: ')}$e')));
       }
     }
 
@@ -58,7 +62,7 @@ class NovelInfoPage extends StatelessWidget {
       create: (context) => NovelInfoCubit(novelId)..load(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('小说详情'),
+          title: Text(l10n('小说详情')),
           actions: [
             BlocBuilder<NovelInfoCubit, NovelInfoState>(
               builder: (context, state) {
@@ -106,35 +110,40 @@ class NovelInfoPage extends StatelessWidget {
                         if (isInBookshelf) {
                           final bid = bookshelfCubit.state.getBookBid(novelId);
                           if (bid == null) return;
-                          actionPath = '/modules/article/bookcase.php?delid=$bid';
+                          actionPath =
+                              '/modules/article/bookcase.php?delid=$bid';
                         } else {
-                          actionPath = '/modules/article/addbookcase.php?bid=$novelId';
+                          actionPath =
+                              '/modules/article/addbookcase.php?bid=$novelId';
                         }
                         showDialog(
                           context: context,
                           barrierDismissible: false,
-                          builder: (ctx) => Dialog.fullscreen(
-                            child: CfActionLoader(
-                              apiHost: apiHost,
-                              actionPath: actionPath,
-                              successUrlKeyword: 'bookcase.php',
-                              successBodyKeyword: '处理成功',
-                              onSuccess: () {
-                                Navigator.of(ctx).pop();
-                                bookshelfCubit.loadBookcases();
-                              },
-                              onError: (err) {
-                                Navigator.of(ctx).pop();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('操作失敗: $err')),
-                                );
-                              },
-                            ),
-                          ),
+                          builder:
+                              (ctx) => Dialog.fullscreen(
+                                child: CfActionLoader(
+                                  apiHost: apiHost,
+                                  actionPath: actionPath,
+                                  successUrlKeyword: 'bookcase.php',
+                                  successBodyKeyword: '处理成功',
+                                  onSuccess: () {
+                                    Navigator.of(ctx).pop();
+                                    bookshelfCubit.loadBookcases();
+                                  },
+                                  onError: (err) {
+                                    Navigator.of(ctx).pop();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('${l10n('操作失敗: ')}$err'),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
                         );
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('操作失败: $e')),
+                          SnackBar(content: Text('${l10n('操作失败: ')}$e')),
                         );
                       }
                     }
@@ -150,7 +159,7 @@ class NovelInfoPage extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (state is NovelInfoError) {
-              return Center(child: Text('加载失败: ${state.message}'));
+              return Center(child: Text('${l10n('加载失败: ')}${state.message}'));
             }
             if (state is NovelInfoLoaded) {
               return _NovelInfoContent(
@@ -231,17 +240,17 @@ class _NovelInfoContent extends StatelessWidget {
               children: [
                 _StatItem(
                   icon: Icons.update,
-                  label: '更新',
-                  value: novelInfo.finUpdate,
+                  label: l10n('更新'),
+                  value: cv(novelInfo.finUpdate),
                 ),
                 _StatItem(
                   icon: Icons.comment,
-                  label: '评论',
+                  label: l10n('评论'),
                   value: '',
                   onTap: () {
                     Navigator.of(context).pushNamed(
                       '/novel/reviews',
-                      arguments: { 'aid': novelId, 'title': novelInfo.title },
+                      arguments: {'aid': novelId, 'title': cv(novelInfo.title)},
                     );
                   },
                 ),
@@ -259,7 +268,7 @@ class _NovelInfoContent extends StatelessWidget {
             ),
           ),
         ),
-        SliverToBoxAdapter(child: _NovelTags(tags: novelInfo.tags)),
+        SliverToBoxAdapter(child: _NovelTags(tags: cvAll(novelInfo.tags))),
         // 添加继续阅读按钮
         if (state.readingHistory != null)
           SliverToBoxAdapter(
@@ -279,7 +288,9 @@ class _NovelInfoContent extends StatelessWidget {
                       state.readingHistory!.novelName,
                     ),
                 icon: const Icon(Icons.book),
-                label: Text('继续阅读 - ${state.readingHistory!.chapterTitle}'),
+                label: Text(
+                  '${l10n('继续阅读 - ')}${cv(state.readingHistory!.chapterTitle)}',
+                ),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
@@ -287,7 +298,7 @@ class _NovelInfoContent extends StatelessWidget {
             ),
           ),
         SliverToBoxAdapter(
-          child: _NovelDescription(description: novelInfo.introduce),
+          child: _NovelDescription(description: cv(novelInfo.introduce)),
         ),
         SliverList(
           delegate: SliverChildBuilderDelegate((context, index) {
@@ -299,7 +310,7 @@ class _NovelInfoContent extends StatelessWidget {
                     context,
                     chapter.aid,
                     chapter.cid,
-                    chapter.title,
+                    cv(chapter.title),
                   ),
             );
           }, childCount: volumes.length),
@@ -336,7 +347,7 @@ class _NovelHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  novelInfo.title,
+                  cv(novelInfo.title),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
@@ -353,7 +364,7 @@ class _NovelHeader extends StatelessWidget {
                     context.read<NovelInfoCubit>().loadHistory();
                   },
                   child: Text(
-                    '作者：${novelInfo.author}',
+                    '${l10n('作者：')}${cv(novelInfo.author)}',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.primary,
                       decoration: TextDecoration.underline,
@@ -362,14 +373,14 @@ class _NovelHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '状态：${novelInfo.status}',
+                  '${l10n('状态：')}${cv(novelInfo.status)}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 if (novelInfo.isAnimated)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      '动画化',
+                      l10n('动画化'),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                       ),
@@ -406,17 +417,14 @@ class _StatItem extends StatelessWidget {
         const SizedBox(width: 4),
         value != ''
             ? Text(
-                '$label: $value',
-                style: Theme.of(context).textTheme.bodySmall,
-              )
+              '$label: $value',
+              style: Theme.of(context).textTheme.bodySmall,
+            )
             : Text(label, style: Theme.of(context).textTheme.bodySmall),
       ],
     );
     if (onTap != null) {
-      return InkWell(
-        onTap: onTap,
-        child: row,
-      );
+      return InkWell(onTap: onTap, child: row);
     }
     return row;
   }
@@ -434,7 +442,7 @@ class _NovelDescription extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('简介', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n('简介'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Html(
             data: description,
@@ -531,10 +539,10 @@ class _VolumeItemState extends State<_VolumeItem> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      widget.volume.title,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                      cv(widget.volume.title),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -555,7 +563,7 @@ class _VolumeItemState extends State<_VolumeItem> {
                     children: [
                       Expanded(
                         child: Text(
-                          chapter.title,
+                          cv(chapter.title),
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ),

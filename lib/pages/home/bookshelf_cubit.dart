@@ -67,14 +67,15 @@ class BookshelfState {
     for (final books in bookcaseContents.values) {
       final book = books.firstWhere(
         (book) => book.aid == aid,
-        orElse: () => BookcaseItem(
-          aid: '',
-          bid: '',
-          title: '',
-          author: '',
-          cid: '',
-          chapterName: '',
-        ),
+        orElse:
+            () => BookcaseItem(
+              aid: '',
+              bid: '',
+              title: '',
+              author: '',
+              cid: '',
+              chapterName: '',
+            ),
       );
       if (book.bid.isNotEmpty) {
         return book.bid;
@@ -87,23 +88,28 @@ class BookshelfState {
 }
 
 class BookshelfCubit extends Cubit<BookshelfState> {
-  BookshelfCubit() : super(BookshelfState(
-    tip: '',
-    status: BookshelfStatus.initial,
-    bookcases: const [],
-    bookcaseContents: const {},
-  ));
+  BookshelfCubit()
+    : super(
+        BookshelfState(
+          tip: '',
+          status: BookshelfStatus.initial,
+          bookcases: const [],
+          bookcaseContents: const {},
+        ),
+      );
 
   Future<void> loadBookcases() async {
     try {
       emit(state.copyWith(status: BookshelfStatus.loading));
       final bookcases = await bookcaseList();
       if (bookcases.isEmpty) {
-        emit(state.copyWith(
-          status: BookshelfStatus.success,
-          bookcases: const [],
-          bookcaseContents: const {},
-        ));
+        emit(
+          state.copyWith(
+            status: BookshelfStatus.success,
+            bookcases: const [],
+            bookcaseContents: const {},
+          ),
+        );
         return;
       }
 
@@ -112,27 +118,28 @@ class BookshelfCubit extends Cubit<BookshelfState> {
       // 先載入第一個書架，立即 emit 讓 UI 顯示
       final firstBk = await bookInCase(caseId: bookcases.first.id);
       contents[bookcases.first.id] = firstBk.items;
-      emit(state.copyWith(
-        tip: firstBk.tip,
-        status: BookshelfStatus.success,
-        bookcases: bookcases,
-        currentCaseId: bookcases.first.id,
-        bookcaseContents: Map.from(contents),
-      ));
+      emit(
+        state.copyWith(
+          tip: firstBk.tip,
+          status: BookshelfStatus.success,
+          bookcases: bookcases,
+          currentCaseId: bookcases.first.id,
+          bookcaseContents: Map.from(contents),
+        ),
+      );
 
       // 後續書架在背景繼續載入，每載完一個就更新
       for (int i = 1; i < bookcases.length; i++) {
         final bk = await bookInCase(caseId: bookcases[i].id);
         contents[bookcases[i].id] = bk.items;
-        emit(state.copyWith(
-          tip: bk.tip,
-          bookcaseContents: Map.from(contents),
-        ));
+        emit(state.copyWith(tip: bk.tip, bookcaseContents: Map.from(contents)));
       }
     } catch (e) {
       final msg = e.toString();
       // 403 / CF 封鎖 → 改用 WebView 繞過
-      if (msg.contains('403') || msg.contains('Cloudflare') || msg.contains('cf_')) {
+      if (msg.contains('403') ||
+          msg.contains('Cloudflare') ||
+          msg.contains('cf_')) {
         emit(state.copyWith(status: BookshelfStatus.cloudflareChallenge));
       } else {
         emit(state.copyWith(status: BookshelfStatus.error, errorMessage: msg));
@@ -145,19 +152,20 @@ class BookshelfCubit extends Cubit<BookshelfState> {
     List<Bookcase> bookcases,
     Map<String, BookcaseDto> bookcaseContents,
   ) {
-    final tip = bookcaseContents.values.isNotEmpty
-        ? bookcaseContents.values.last.tip
-        : '';
-    final contents = bookcaseContents.map(
-      (k, v) => MapEntry(k, v.items),
+    final tip =
+        bookcaseContents.values.isNotEmpty
+            ? bookcaseContents.values.last.tip
+            : '';
+    final contents = bookcaseContents.map((k, v) => MapEntry(k, v.items));
+    emit(
+      state.copyWith(
+        tip: tip,
+        status: BookshelfStatus.success,
+        bookcases: bookcases,
+        currentCaseId: bookcases.isNotEmpty ? bookcases.first.id : null,
+        bookcaseContents: contents,
+      ),
     );
-    emit(state.copyWith(
-      tip: tip,
-      status: BookshelfStatus.success,
-      bookcases: bookcases,
-      currentCaseId: bookcases.isNotEmpty ? bookcases.first.id : null,
-      bookcaseContents: contents,
-    ));
   }
 
   void setError(String message) {
@@ -169,10 +177,12 @@ class BookshelfCubit extends Cubit<BookshelfState> {
   }
 
   void toggleSelectMode() {
-    emit(state.copyWith(
-      isSelecting: !state.isSelecting,
-      selectedBids: state.isSelecting ? {} : state.selectedBids,
-    ));
+    emit(
+      state.copyWith(
+        isSelecting: !state.isSelecting,
+        selectedBids: state.isSelecting ? {} : state.selectedBids,
+      ),
+    );
   }
 
   void toggleBookSelection(String bid) {
@@ -199,7 +209,9 @@ class BookshelfCubit extends Cubit<BookshelfState> {
       );
     } catch (e) {
       final msg = e.toString();
-      if (msg.contains('403') || msg.contains('Cloudflare') || msg.contains('cf_')) {
+      if (msg.contains('403') ||
+          msg.contains('Cloudflare') ||
+          msg.contains('cf_')) {
         rethrow; // 讓 UI 層用 WebView 重試
       }
       emit(state.copyWith(status: BookshelfStatus.error, errorMessage: msg));
@@ -207,15 +219,20 @@ class BookshelfCubit extends Cubit<BookshelfState> {
     }
 
     // 寫入成功 → 樂觀更新本地狀態，無需等伺服器回傳
-    final newContents = Map<String, List<BookcaseItem>>.from(state.bookcaseContents);
-    newContents[fromId] = (newContents[fromId] ?? [])
-        .where((b) => !bidsToMove.contains(b.bid))
-        .toList();
-    emit(state.copyWith(
-      bookcaseContents: newContents,
-      selectedBids: {},
-      isSelecting: false,
-    ));
+    final newContents = Map<String, List<BookcaseItem>>.from(
+      state.bookcaseContents,
+    );
+    newContents[fromId] =
+        (newContents[fromId] ?? [])
+            .where((b) => !bidsToMove.contains(b.bid))
+            .toList();
+    emit(
+      state.copyWith(
+        bookcaseContents: newContents,
+        selectedBids: {},
+        isSelecting: false,
+      ),
+    );
 
     // 背景刷新伺服器資料（失敗不影響已更新的 UI）
     unawaited(_refreshBookcasesInBackground());
@@ -226,7 +243,9 @@ class BookshelfCubit extends Cubit<BookshelfState> {
       await addBookshelf(aid: aid);
     } catch (e) {
       final msg = e.toString();
-      if (msg.contains('403') || msg.contains('Cloudflare') || msg.contains('cf_')) {
+      if (msg.contains('403') ||
+          msg.contains('Cloudflare') ||
+          msg.contains('cf_')) {
         rethrow; // 讓 novel_info_page 用 WebView 重試
       }
       emit(state.copyWith(status: BookshelfStatus.error, errorMessage: msg));
@@ -245,7 +264,9 @@ class BookshelfCubit extends Cubit<BookshelfState> {
       await deleteBookcase(bid: bid);
     } catch (e) {
       final msg = e.toString();
-      if (msg.contains('403') || msg.contains('Cloudflare') || msg.contains('cf_')) {
+      if (msg.contains('403') ||
+          msg.contains('Cloudflare') ||
+          msg.contains('cf_')) {
         rethrow; // 讓 novel_info_page 用 WebView 重試
       }
       emit(state.copyWith(status: BookshelfStatus.error, errorMessage: msg));

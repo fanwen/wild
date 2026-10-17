@@ -28,4 +28,4 @@ class FontSizeCubit extends Cubit<double> {
       emit(size);
     }
   }
-} 
+}

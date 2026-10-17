@@ -13,10 +13,12 @@ class ReaderTypeCubit extends Cubit<ReaderType> {
     try {
       final savedValue = await loadProperty(key: _key);
       if (savedValue.isNotEmpty) {
-        emit(ReaderType.values.firstWhere(
-          (type) => type.toString() == savedValue,
-          orElse: () => _defaultType,
-        ));
+        emit(
+          ReaderType.values.firstWhere(
+            (type) => type.toString() == savedValue,
+            orElse: () => _defaultType,
+          ),
+        );
       }
     } catch (e) {
       // 如果加载失败，使用默认值
@@ -33,4 +35,4 @@ class ReaderTypeCubit extends Cubit<ReaderType> {
       emit(type);
     }
   }
-} 
+}

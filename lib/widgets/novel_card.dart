@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:wild/widgets/cached_image.dart';
 import 'package:wild/src/rust/wenku8/models.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class NovelCard extends StatelessWidget {
   final String title;
@@ -42,9 +43,9 @@ class NovelCard extends StatelessWidget {
     bool showAuthor = true,
   }) {
     return NovelCard(
-      title: novel.title,
+      title: cv(novel.title),
       coverUrl: novel.coverUrl,
-      author: novel.author,
+      author: novel.author == null ? null : cv(novel.author!),
       onTap: onTap,
       width: width,
       height: height,
@@ -68,7 +69,7 @@ class NovelCard extends StatelessWidget {
     bool showAuthor = false,
   }) {
     return NovelCard(
-      title: novel.title,
+      title: cv(novel.title),
       coverUrl: novel.img,
       onTap: onTap,
       width: width,
@@ -113,7 +114,8 @@ class NovelCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: showAuthor ? null : 12,
-                      fontWeight: showAuthor ? FontWeight.bold : FontWeight.w500,
+                      fontWeight:
+                          showAuthor ? FontWeight.bold : FontWeight.w500,
                     ),
                   ),
                   if (showAuthor && author != null) ...[
@@ -138,4 +140,4 @@ class NovelCard extends StatelessWidget {
 
     return card;
   }
-} 
+}

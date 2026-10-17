@@ -4,6 +4,8 @@ import 'package:wild/pages/novel/novel_download_cubit.dart';
 import 'package:wild/widgets/cached_image.dart';
 import 'package:wild/pages/novel/novel_download_info_page.dart';
 import 'package:wild/src/rust/api/wenku8.dart' as w8;
+import 'package:wild/l10n/ui_language.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class NovelDownloadPage extends StatelessWidget {
   const NovelDownloadPage({super.key});
@@ -24,18 +26,18 @@ class _NovelDownloadContent extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('下载'),
+        title: Text(l10n('下载')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: '重置失败下载',
+            tooltip: l10n('重置失败下载'),
             onPressed: () async {
               try {
                 await w8.resetFailDownloads();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('已重置所有失败的下载'),
+                    SnackBar(
+                      content: Text(l10n('已重置所有失败的下载')),
                       duration: Duration(seconds: 2),
                     ),
                   );
@@ -47,7 +49,7 @@ class _NovelDownloadContent extends StatelessWidget {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('重置失败: $e'),
+                      content: Text('${l10n('重置失败: ')}$e'),
                       duration: const Duration(seconds: 2),
                     ),
                   );
@@ -74,7 +76,7 @@ class _NovelDownloadContent extends StatelessWidget {
                     onPressed: () {
                       context.read<NovelDownloadCubit>().loadDownloads();
                     },
-                    child: const Text('重试'),
+                    child: Text(l10n('重试')),
                   ),
                 ],
               ),
@@ -82,9 +84,7 @@ class _NovelDownloadContent extends StatelessWidget {
           }
 
           if (state.downloads.isEmpty) {
-            return const Center(
-              child: Text('暂无下载内容'),
-            );
+            return Center(child: Text(l10n('暂无下载内容')));
           }
 
           return ListView.builder(
@@ -98,9 +98,10 @@ class _NovelDownloadContent extends StatelessWidget {
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => NovelDownloadInfoPage(
-                          novelId: download.novelId,
-                        ),
+                        builder:
+                            (context) => NovelDownloadInfoPage(
+                              novelId: download.novelId,
+                            ),
                       ),
                     );
                     if (context.mounted) {
@@ -127,7 +128,7 @@ class _NovelDownloadContent extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                download.novelName,
+                                cv(download.novelName),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -155,7 +156,7 @@ class _NovelDownloadContent extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    '${download.downloadChapterCount}/${download.chooseChapterCount} 章节',
+                                    '${download.downloadChapterCount}/${download.chooseChapterCount}${l10n(' 章节')}',
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.grey[600],
@@ -176,7 +177,9 @@ class _NovelDownloadContent extends StatelessWidget {
                                     _getStatusText(download.downloadStatus),
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: _getStatusColor(download.downloadStatus),
+                                      color: _getStatusColor(
+                                        download.downloadStatus,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -216,15 +219,15 @@ class _NovelDownloadContent extends StatelessWidget {
   String _getStatusText(int status) {
     switch (status) {
       case 0: // DOWNLOAD_STATUS_NOT_DOWNLOAD
-        return '等待下载';
+        return l10n('等待下载');
       case 1: // DOWNLOAD_STATUS_SUCCESS
-        return '下载完成';
+        return l10n('下载完成');
       case 2: // DOWNLOAD_STATUS_FAILED
-        return '下载失败';
+        return l10n('下载失败');
       case 3: // DOWNLOAD_STATUS_DELETING
-        return '正在删除';
+        return l10n('正在删除');
       default:
-        return '未知状态';
+        return l10n('未知状态');
     }
   }
 
@@ -242,4 +245,4 @@ class _NovelDownloadContent extends StatelessWidget {
         return Colors.grey;
     }
   }
-} 
+}

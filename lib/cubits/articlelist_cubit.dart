@@ -60,11 +60,13 @@ class ArticlelistCubit extends Cubit<ArticlelistState> {
     if (state is! ArticlelistLoaded) {
       emit(ArticlelistLoaded(novels: []));
     } else if (refresh) {
-      emit((state as ArticlelistLoaded).copyWith(
-        novels: [],
-        currentPage: 1,
-        hasMore: true,
-      ));
+      emit(
+        (state as ArticlelistLoaded).copyWith(
+          novels: [],
+          currentPage: 1,
+          hasMore: true,
+        ),
+      );
     }
 
     final currentState = state;
@@ -78,33 +80,43 @@ class ArticlelistCubit extends Cubit<ArticlelistState> {
         fullflag: 1, // 1 表示完本小说
         page: page,
       );
-      final novels = result.records.map((cover) => Novel(
-        id: cover.aid,
-        title: cover.title,
-        author: '', // 需要从 novelInfo 获取
-        coverUrl: cover.img,
-        lastChapter: '', // 需要从 novelInfo 获取
-        tags: [], // 需要从 novelInfo 获取
-      )).toList();
+      final novels =
+          result.records
+              .map(
+                (cover) => Novel(
+                  id: cover.aid,
+                  title: cover.title,
+                  author: '', // 需要从 novelInfo 获取
+                  coverUrl: cover.img,
+                  lastChapter: '', // 需要从 novelInfo 获取
+                  tags: [], // 需要从 novelInfo 获取
+                ),
+              )
+              .toList();
       final hasMore = novels.isNotEmpty;
 
       if (state is ArticlelistLoaded) {
         final currentState = state as ArticlelistLoaded;
-        final updatedNovels = refresh ? novels : [...currentState.novels, ...novels];
-        emit(currentState.copyWith(
-          novels: updatedNovels,
-          currentPage: page + 1,
-          hasMore: hasMore,
-        ));
+        final updatedNovels =
+            refresh ? novels : [...currentState.novels, ...novels];
+        emit(
+          currentState.copyWith(
+            novels: updatedNovels,
+            currentPage: page + 1,
+            hasMore: hasMore,
+          ),
+        );
       } else {
-        emit(ArticlelistLoaded(
-          novels: novels,
-          currentPage: page + 1,
-          hasMore: hasMore,
-        ));
+        emit(
+          ArticlelistLoaded(
+            novels: novels,
+            currentPage: page + 1,
+            hasMore: hasMore,
+          ),
+        );
       }
     } catch (e) {
       emit(ArticlelistError(e.toString()));
     }
   }
-} 
+}

@@ -1,10 +1,11 @@
+import 'package:wild/widgets/content_language_row.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wild/pages/novel/paragraph_spacing_cubit.dart';
 import 'package:wild/pages/novel/reader_cubit.dart';
 import 'package:wild/pages/novel/theme_cubit.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:wild/widgets/cached_image.dart';
 import 'package:wild/cubits/screen_keep_on.dart';
 import 'package:wild/cubits/volume_control_cubit.dart';
 import 'package:wild/utils/controller_event.dart';
@@ -12,6 +13,7 @@ import 'dart:io';
 
 import '../../src/rust/wenku8/models.dart';
 import 'font_size_cubit.dart';
+import 'font_family_cubit.dart';
 import 'line_height_cubit.dart';
 import 'top_bar_height_cubit.dart';
 import 'bottom_bar_height_cubit.dart';
@@ -19,6 +21,13 @@ import 'left_padding_cubit.dart';
 import 'right_padding_cubit.dart';
 import 'reader_type_cubit.dart';
 import 'package:wild/cubits/reader_background_cubit.dart';
+import 'package:wild/cubits/reader_battery.dart';
+import 'package:wild/cubits/reader_clock.dart';
+import 'package:wild/widgets/reader_font_row.dart';
+import 'package:wild/widgets/reader_corners.dart';
+import 'package:wild/widgets/tappable_reader_image.dart';
+import 'package:wild/l10n/ui_language.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class ReaderPage extends StatelessWidget {
   final String aid;
@@ -42,6 +51,7 @@ class ReaderPage extends StatelessWidget {
   Widget build(BuildContext context) {
     print('ReaderPage building with initialPage: $initialPage');
     final fontSizeCubit = context.read<FontSizeCubit>();
+    final fontFamilyCubit = context.read<FontFamilyCubit>();
     final paragraphSpacingCubit = context.read<ParagraphSpacingCubit>();
     final lineHeightCubit = context.read<LineHeightCubit>();
     final topBarHeightCubit = context.read<TopBarHeightCubit>();
@@ -53,6 +63,7 @@ class ReaderPage extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider.value(value: fontSizeCubit),
+        BlocProvider.value(value: fontFamilyCubit),
         BlocProvider.value(value: paragraphSpacingCubit),
         BlocProvider.value(value: lineHeightCubit),
         BlocProvider.value(value: topBarHeightCubit),
@@ -61,19 +72,21 @@ class ReaderPage extends StatelessWidget {
         BlocProvider.value(value: rightPaddingCubit),
         BlocProvider.value(value: readerTypeCubit),
         BlocProvider(
-          create: (context) => ReaderCubit(
-            novelInfo: novelInfo,
-            initialAid: aid,
-            initialCid: cid,
-            initialVolumes: volumes,
-            fontSizeCubit: fontSizeCubit,
-            paragraphSpacingCubit: paragraphSpacingCubit,
-            lineHeightCubit: lineHeightCubit,
-            topBarHeightCubit: topBarHeightCubit,
-            bottomBarHeightCubit: bottomBarHeightCubit,
-            leftPaddingCubit: leftPaddingCubit,
-            rightPaddingCubit: rightPaddingCubit,
-          )..loadChapter(initialPage: initialPage),
+          create:
+              (context) => ReaderCubit(
+                novelInfo: novelInfo,
+                initialAid: aid,
+                initialCid: cid,
+                initialVolumes: volumes,
+                fontSizeCubit: fontSizeCubit,
+                fontFamilyCubit: fontFamilyCubit,
+                paragraphSpacingCubit: paragraphSpacingCubit,
+                lineHeightCubit: lineHeightCubit,
+                topBarHeightCubit: topBarHeightCubit,
+                bottomBarHeightCubit: bottomBarHeightCubit,
+                leftPaddingCubit: leftPaddingCubit,
+                rightPaddingCubit: rightPaddingCubit,
+              )..loadChapter(initialPage: initialPage),
         ),
       ],
       child: BlocBuilder<ReaderCubit, ReaderState>(
@@ -96,7 +109,7 @@ class ReaderPage extends StatelessWidget {
                       ElevatedButton(
                         onPressed:
                             () => context.read<ReaderCubit>().loadChapter(),
-                        child: const Text('重试'),
+                        child: Text(l10n('重试')),
                       ),
                     ],
                   ),
@@ -105,6 +118,13 @@ class ReaderPage extends StatelessWidget {
             );
           }
           if (state is ReaderLoaded) {
+            // 内容字形（繁/简）换了就重读本章：正文和章节名要按新设置重新转换
+            final readerCubit = context.read<ReaderCubit>();
+            if (readerCubit.loadedScript != contentScriptNow) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                readerCubit.loadChapter();
+              });
+            }
             return _ReaderView(state: state, title: state.title);
           }
           return const SizedBox.shrink();
@@ -135,7 +155,14 @@ class _ReaderViewState extends State<_ReaderView> {
       initialPage: widget.state.currentPageIndex,
     );
     setKeepScreenUpOnReading(true);
-    
+
+    // 进阅读器即全屏：隐藏状态栏与导航栏（沉浸式，边缘下滑可临时唤出）
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    // 四角信息的数据源
+    startBatteryWatch();
+    startReaderClock();
+
     // 监听音量键事件
     if (Platform.isAndroid || Platform.isIOS) {
       final volumeControlCubit = context.read<VolumeControlCubit>();
@@ -152,12 +179,17 @@ class _ReaderViewState extends State<_ReaderView> {
     setKeepScreenUpOnReading(false);
     setKeepScreenUpOnScroll(false);
 
+    // 退出阅读器恢复系统栏
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    stopBatteryWatch();
+    stopReaderClock();
+
     // 取消音量键事件监听
     if (Platform.isAndroid || Platform.isIOS) {
       delVolumeListen();
       readerControllerEvent.unsubscribe(_onController);
     }
-    
+
     super.dispose();
   }
 
@@ -192,8 +224,8 @@ class _ReaderViewState extends State<_ReaderView> {
             preTime = now;
             // 显示提示信息
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('再次点击加载上一章'),
+              SnackBar(
+                content: Text(l10n('再次点击加载上一章')),
                 duration: Duration(seconds: 2),
                 behavior: SnackBarBehavior.floating,
                 margin: EdgeInsets.only(bottom: 16),
@@ -301,8 +333,21 @@ class _ReaderViewState extends State<_ReaderView> {
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final topPadding = mediaQuery.padding.top;
-    final bottomPadding = mediaQuery.padding.bottom;
+    final topPadding = mediaQuery.viewPadding.top;
+    final bottomPadding = mediaQuery.viewPadding.bottom;
+    // 四角信息要和正文块对齐，所以订阅这些边距（改设置时角标跟着动）
+    final topBarHeight = context.select<TopBarHeightCubit, double>(
+      (cubit) => cubit.state,
+    );
+    final bottomBarHeight = context.select<BottomBarHeightCubit, double>(
+      (cubit) => cubit.state,
+    );
+    final leftPadding = context.select<LeftPaddingCubit, double>(
+      (cubit) => cubit.state,
+    );
+    final rightPadding = context.select<RightPaddingCubit, double>(
+      (cubit) => cubit.state,
+    );
 
     final ThemeCubit themeCubit = context.read<ThemeCubit>();
     bool isDarkMode;
@@ -328,11 +373,15 @@ class _ReaderViewState extends State<_ReaderView> {
           builder: (context, backgroundState) {
             String? backgroundImagePath;
             if (isDarkMode && backgroundState.darkBackgroundExists) {
-              backgroundImagePath = context.read<ReaderBackgroundCubit>().getDarkBackgroundPath();
+              backgroundImagePath =
+                  context.read<ReaderBackgroundCubit>().getDarkBackgroundPath();
             } else if (!isDarkMode && backgroundState.lightBackgroundExists) {
-              backgroundImagePath = context.read<ReaderBackgroundCubit>().getLightBackgroundPath();
+              backgroundImagePath =
+                  context
+                      .read<ReaderBackgroundCubit>()
+                      .getLightBackgroundPath();
             }
-            
+
             return Scaffold(
               backgroundColor: backgroundColor,
               body: Stack(
@@ -343,91 +392,109 @@ class _ReaderViewState extends State<_ReaderView> {
                       child: Image.file(
                         File(backgroundImagePath),
                         fit: BoxFit.cover,
-                        opacity: AlwaysStoppedAnimation(backgroundState.opacity),
+                        opacity: AlwaysStoppedAnimation(
+                          backgroundState.opacity,
+                        ),
                       ),
                     ),
-              // 阅读内容
-              Positioned.fill(
-                child: GestureDetector(
-                  onTapDown: _handleTap,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: widget.state.pages.length,
-                    onPageChanged: (index) {
-                      context.read<ReaderCubit>().onPageChanged(index);
-                    },
-                    itemBuilder: (context, index) {
-                      final page = widget.state.pages[index];
-                      if (page.isImage) {
-                        return _ImagePage(
-                          imageUrl: page.content,
-                          textColor: textColor,
-                          pageNumber: widget.state.currentPageIndex + 1,
-                          pageCount: widget.state.pages.length,
-                        );
-                      }
-                      return _TextPage(
-                        content: page.content,
-                        textColor: textColor,
-                        pageNumber: widget.state.currentPageIndex + 1,
-                        pageCount: widget.state.pages.length,
-                      );
-                    },
-                  ),
-                ),
-              ),
-              // 控制栏
-              if (state.showControls) ...[
-                // 顶部栏
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    color: Colors.black.withOpacity(0.7),
-                    padding: EdgeInsets.fromLTRB(16, topPadding + 8, 16, 16),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.arrow_back,
-                            color: Colors.white,
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                        Expanded(
-                          child: Text(
-                            widget.title,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.menu_book,
-                            color: Colors.white,
-                          ),
-                          onPressed: _showChapterList,
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.settings,
-                            color: Colors.white,
-                          ),
-                          onPressed: _showSettings,
-                        ),
-                      ],
+                  // 阅读内容
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTapDown: _handleTap,
+                      child: PageView.builder(
+                        controller: _pageController,
+                        itemCount: widget.state.pages.length,
+                        onPageChanged: (index) {
+                          context.read<ReaderCubit>().onPageChanged(index);
+                        },
+                        itemBuilder: (context, index) {
+                          final page = widget.state.pages[index];
+                          if (page.isImage) {
+                            return _ImagePage(
+                              imageUrl: page.content,
+                              textColor: textColor,
+                            );
+                          }
+                          return _TextPage(
+                            content: page.content,
+                            textColor: textColor,
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ],
-          ),
-        );
+                  // 四角信息：左上电量 / 右上章节名 / 左下时间 / 右下页码+百分比
+                  Positioned.fill(
+                    child: ReaderCorners(
+                      chapterTitle: widget.title,
+                      color: textColor,
+                      padding: EdgeInsets.only(
+                        top: topPadding + topBarHeight,
+                        bottom: bottomPadding + bottomBarHeight,
+                        left: leftPadding,
+                        right: rightPadding,
+                      ),
+                      pageNumber: widget.state.currentPageIndex + 1,
+                      pageCount: widget.state.pages.length,
+                    ),
+                  ),
+                  // 控制栏
+                  if (state.showControls) ...[
+                    // 顶部栏
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        color: Colors.black.withOpacity(0.7),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          topPadding + 8,
+                          16,
+                          16,
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back,
+                                color: Colors.white,
+                              ),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                            Expanded(
+                              child: Text(
+                                widget.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.menu_book,
+                                color: Colors.white,
+                              ),
+                              onPressed: _showChapterList,
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.settings,
+                                color: Colors.white,
+                              ),
+                              onPressed: _showSettings,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
           },
         );
       },
@@ -465,15 +532,8 @@ class _ReaderViewState extends State<_ReaderView> {
 class _TextPage extends StatelessWidget {
   final String content;
   final Color textColor;
-  final int pageNumber;
-  final int pageCount;
 
-  const _TextPage({
-    required this.content,
-    required this.textColor,
-    required this.pageNumber,
-    required this.pageCount,
-  });
+  const _TextPage({required this.content, required this.textColor});
 
   @override
   Widget build(BuildContext context) {
@@ -482,15 +542,20 @@ class _TextPage extends StatelessWidget {
     final screenHeight =
         MediaQueryData.fromView(WidgetsBinding.instance.window).size.height;
     final topPadding =
-        MediaQueryData.fromView(WidgetsBinding.instance.window).padding.top;
+        MediaQueryData.fromView(WidgetsBinding.instance.window).viewPadding.top;
     final bottomPadding =
-        MediaQueryData.fromView(WidgetsBinding.instance.window).padding.bottom;
+        MediaQueryData.fromView(
+          WidgetsBinding.instance.window,
+        ).viewPadding.bottom;
     final topBarHeight = context.read<TopBarHeightCubit>().state;
     final bottomBarHeight = context.read<BottomBarHeightCubit>().state;
     final leftPadding = context.read<LeftPaddingCubit>().state;
     final rightPadding = context.read<RightPaddingCubit>().state;
     final leftAndRightPadding = leftPadding + rightPadding;
     final canvasWidth = screenWidth - leftAndRightPadding;
+    final fontFamily = context.select<FontFamilyCubit, String>(
+      (cubit) => cubit.state.family,
+    );
     final canvasHeight =
         screenHeight -
         topPadding -
@@ -518,6 +583,8 @@ class _TextPage extends StatelessWidget {
                             text: texts[i],
                             style: TextStyle(
                               fontSize: fontSize,
+                              fontFamily:
+                                  fontFamily.isEmpty ? null : fontFamily,
                               height: lineHeight,
                               letterSpacing: 0.5,
                               color: textColor,
@@ -528,18 +595,6 @@ class _TextPage extends StatelessWidget {
                       if (i < texts.length - 1) Container(height: spacing),
                     ],
                     Expanded(child: Container()),
-                    SizedBox(
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Opacity(
-                          opacity: 0.3,
-                          child: Text(
-                            '$pageNumber/$pageCount',
-                            style: TextStyle(fontSize: 10, color: textColor),
-                          ),
-                        ),
-                      ),
-                    ),
                     Container(height: bottomPadding),
                   ],
                 );
@@ -555,23 +610,16 @@ class _TextPage extends StatelessWidget {
 class _ImagePage extends StatelessWidget {
   final String imageUrl;
   final Color textColor;
-  final int pageNumber;
-  final int pageCount;
 
-  const _ImagePage({
-    required this.imageUrl,
-    required this.textColor,
-    required this.pageNumber,
-    required this.pageCount,
-  });
+  const _ImagePage({required this.imageUrl, required this.textColor});
 
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
     final screenHeight = mediaQuery.size.height;
     final screenWidth = mediaQuery.size.width;
-    final topPadding = mediaQuery.padding.top;
-    final bottomPadding = mediaQuery.padding.bottom;
+    final topPadding = mediaQuery.viewPadding.top;
+    final bottomPadding = mediaQuery.viewPadding.bottom;
     final topBarHeight = context.read<TopBarHeightCubit>().state;
     final bottomBarHeight = context.read<BottomBarHeightCubit>().state;
     final leftPadding = context.read<LeftPaddingCubit>().state;
@@ -590,51 +638,13 @@ class _ImagePage extends StatelessWidget {
         SizedBox(
           width: screenWidth - leftAndRightPadding,
           height: availableHeight,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: availableHeight,
-                maxWidth: screenWidth - leftAndRightPadding,
-              ),
-              child: Image(
-                image: CachedImageProvider(imageUrl),
-                width: screenWidth - leftAndRightPadding,
-                height: availableHeight,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    width: screenWidth - leftAndRightPadding,
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    width: screenWidth - leftAndRightPadding,
-                    color: Colors.grey[200],
-                    child: const Center(child: Text('图片加载失败')),
-                  );
-                },
-              ),
-            ),
+          // 点图片打开全屏看图；点图片以外的留白和点正文中央一样，呼出上面的菜单栏
+          child: TappableReaderImage(
+            imageUrl: imageUrl,
+            onOutsideTap: () => context.read<ReaderCubit>().toggleControls(),
           ),
         ),
         Expanded(child: Container()),
-        SizedBox(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Opacity(
-              opacity: 0.3,
-              child: Text(
-                '$pageNumber/$pageCount',
-                style: TextStyle(fontSize: 10, color: textColor),
-              ),
-            ),
-          ),
-        ),
         Container(height: bottomPadding),
       ],
     );
@@ -760,15 +770,15 @@ class _ChapterListState extends State<_ChapterList> {
               children: [
                 const Icon(Icons.menu_book),
                 const SizedBox(width: 8),
-                const Text(
-                  '目录',
+                Text(
+                  l10n('目录'),
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 TextButton.icon(
                   onPressed: () => Navigator.pop(context),
                   icon: const Icon(Icons.close),
-                  label: const Text('关闭'),
+                  label: Text(l10n('关闭')),
                   style: TextButton.styleFrom(
                     foregroundColor: Theme.of(context).colorScheme.secondary,
                   ),
@@ -809,7 +819,7 @@ class _ChapterListState extends State<_ChapterList> {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                volume.title,
+                                cv(volume.title),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
@@ -837,7 +847,7 @@ class _ChapterListState extends State<_ChapterList> {
                                   chapter.cid,
                                 ),
                             title: Text(
-                              chapter.title,
+                              cv(chapter.title),
                               style: TextStyle(
                                 fontWeight: isSelected ? FontWeight.bold : null,
                               ),
@@ -886,7 +896,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
       builder: (BuildContext context) {
         Color pickerColor = initialColor;
         return AlertDialog(
-          title: const Text('选择颜色'),
+          title: Text(l10n('选择颜色')),
           content: SingleChildScrollView(
             child: ColorPicker(
               pickerColor: pickerColor,
@@ -902,13 +912,13 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
           ),
           actions: <Widget>[
             TextButton(
-              child: const Text('取消'),
+              child: Text(l10n('取消')),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: const Text('确定'),
+              child: Text(l10n('确定')),
               onPressed: () async {
                 onColorChanged(pickerColor);
                 Navigator.of(context).pop();
@@ -938,28 +948,28 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
           child: ListView(
             children: [
               Text(
-                '设置',
+                l10n('设置'),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               // 阅读器类型设置
               Row(
                 children: [
-                  Text('阅读器类型'),
+                  Text(l10n('阅读器类型')),
                   const SizedBox(width: 16),
                   Expanded(
                     child: BlocBuilder<ReaderTypeCubit, ReaderType>(
                       builder: (context, type) {
                         return SegmentedButton<ReaderType>(
-                          segments: const [
+                          segments: [
                             ButtonSegment<ReaderType>(
                               value: ReaderType.normal,
-                              label: Text('普通阅读器'),
+                              label: Text(l10n('普通阅读器')),
                               icon: Icon(Icons.book),
                             ),
                             ButtonSegment<ReaderType>(
                               value: ReaderType.html,
-                              label: Text('HTML阅读器'),
+                              label: Text(l10n('HTML阅读器')),
                               icon: Icon(Icons.html),
                             ),
                           ],
@@ -979,13 +989,13 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                 builder: (context, fontSize) {
                   return Row(
                     children: [
-                      Text('字体大小'),
+                      Text(l10n('字体大小')),
                       Expanded(
                         child: Slider(
                           value: fontSize,
                           min: 14,
-                          max: 24,
-                          divisions: 10,
+                          max: 48,
+                          divisions: 34,
                           label: fontSize.round().toString(),
                           onChanged: (value) async {
                             await fontSizeCubit.updateFontSize(value);
@@ -998,12 +1008,23 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                   );
                 },
               ),
+              const Divider(),
+              // 字体设置
+              ReaderFontRow(
+                cubit: context.read<FontFamilyCubit>(),
+                onFontChanged: () async {
+                  await widget.readerCubit.reloadCurrentPage();
+                },
+              ),
+              const Divider(),
+              // 内容语言（正文字形）：跟随界面语言 / 繁體中文 / 简体中文（原文）
+              const ContentLanguageRow(),
               // 段落间距设置
               BlocBuilder<ParagraphSpacingCubit, double>(
                 builder: (context, spacing) {
                   return Row(
                     children: [
-                      Text('段落间距', style: TextStyle()),
+                      Text(l10n('段落间距'), style: TextStyle()),
                       Expanded(
                         child: Slider(
                           value: spacing,
@@ -1027,7 +1048,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                 builder: (context, lineHeight) {
                   return Row(
                     children: [
-                      Text('行高', style: TextStyle()),
+                      Text(l10n('行高'), style: TextStyle()),
                       Expanded(
                         child: Slider(
                           value: lineHeight,
@@ -1051,7 +1072,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                 builder: (context, height) {
                   return Row(
                     children: [
-                      Text('顶部边距'),
+                      Text(l10n('顶部边距')),
                       Expanded(
                         child: Slider(
                           value: height,
@@ -1075,7 +1096,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                 builder: (context, height) {
                   return Row(
                     children: [
-                      Text('底部边距'),
+                      Text(l10n('底部边距')),
                       Expanded(
                         child: Slider(
                           value: height,
@@ -1099,7 +1120,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                 builder: (context, padding) {
                   return Row(
                     children: [
-                      Text('左边距'),
+                      Text(l10n('左边距')),
                       Expanded(
                         child: Slider(
                           value: padding,
@@ -1123,7 +1144,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                 builder: (context, padding) {
                   return Row(
                     children: [
-                      Text('右边距'),
+                      Text(l10n('右边距')),
                       Expanded(
                         child: Slider(
                           value: padding,
@@ -1146,24 +1167,24 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
               // 主题模式选择
               Row(
                 children: [
-                  Text('主题模式', style: TextStyle()),
+                  Text(l10n('主题模式'), style: TextStyle()),
                   const SizedBox(width: 16),
                   Expanded(
                     child: SegmentedButton<ReaderThemeMode>(
-                      segments: const [
+                      segments: [
                         ButtonSegment<ReaderThemeMode>(
                           value: ReaderThemeMode.auto,
-                          label: Text('自动'),
+                          label: Text(l10n('自动')),
                           icon: Icon(Icons.brightness_auto),
                         ),
                         ButtonSegment<ReaderThemeMode>(
                           value: ReaderThemeMode.light,
-                          label: Text('浅色'),
+                          label: Text(l10n('浅色')),
                           icon: Icon(Icons.light_mode),
                         ),
                         ButtonSegment<ReaderThemeMode>(
                           value: ReaderThemeMode.dark,
-                          label: Text('深色'),
+                          label: Text(l10n('深色')),
                           icon: Icon(Icons.dark_mode),
                         ),
                       ],
@@ -1182,7 +1203,10 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
               // 浅色主题颜色设置
               Row(
                 children: [
-                  Text('浅色主题', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    l10n('浅色主题'),
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1199,7 +1223,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                           shape: BoxShape.circle,
                         ),
                       ),
-                      label: const Text('背景颜色'),
+                      label: Text(l10n('背景颜色')),
                       onPressed:
                           () => _showColorPicker(
                             context,
@@ -1225,7 +1249,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                           shape: BoxShape.circle,
                         ),
                       ),
-                      label: const Text('文字颜色'),
+                      label: Text(l10n('文字颜色')),
                       onPressed:
                           () => _showColorPicker(
                             context,
@@ -1245,7 +1269,10 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
               // 深色主题颜色设置
               Row(
                 children: [
-                  Text('深色主题', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    l10n('深色主题'),
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1262,7 +1289,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                           shape: BoxShape.circle,
                         ),
                       ),
-                      label: const Text('背景颜色'),
+                      label: Text(l10n('背景颜色')),
                       onPressed:
                           () => _showColorPicker(
                             context,
@@ -1288,7 +1315,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                           shape: BoxShape.circle,
                         ),
                       ),
-                      label: const Text('文字颜色'),
+                      label: Text(l10n('文字颜色')),
                       onPressed:
                           () => _showColorPicker(context, theme.darkTextColor, (
                             color,
@@ -1308,7 +1335,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                 builder: (context, backgroundState) {
                   return Row(
                     children: [
-                      Text('背景透明度'),
+                      Text(l10n('背景透明度')),
                       Expanded(
                         child: Slider(
                           value: backgroundState.opacity,
@@ -1322,7 +1349,10 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                           },
                         ),
                       ),
-                      Text('${(backgroundState.opacity * 100).round()}%', style: TextStyle()),
+                      Text(
+                        '${(backgroundState.opacity * 100).round()}%',
+                        style: TextStyle(),
+                      ),
                     ],
                   );
                 },
@@ -1331,7 +1361,10 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
               // 背景图片设置
               Row(
                 children: [
-                  Text('背景图片设置', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    l10n('背景图片设置'),
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -1343,14 +1376,19 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              icon: Icon(backgroundState.lightBackgroundExists 
-                                  ? Icons.image 
-                                  : Icons.add_photo_alternate),
-                              label: Text(backgroundState.lightBackgroundExists 
-                                  ? '更新浅色背景' 
-                                  : '设置浅色背景'),
+                              icon: Icon(
+                                backgroundState.lightBackgroundExists
+                                    ? Icons.image
+                                    : Icons.add_photo_alternate,
+                              ),
+                              label: Text(
+                                backgroundState.lightBackgroundExists
+                                    ? l10n('更新浅色背景')
+                                    : l10n('设置浅色背景'),
+                              ),
                               onPressed: () async {
-                                await readerBackgroundCubit.updateLightBackground();
+                                await readerBackgroundCubit
+                                    .updateLightBackground();
                                 await widget.readerCubit.reloadCurrentPage();
                               },
                             ),
@@ -1359,9 +1397,10 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                           if (backgroundState.lightBackgroundExists)
                             OutlinedButton.icon(
                               icon: const Icon(Icons.delete),
-                              label: const Text('删除'),
+                              label: Text(l10n('删除')),
                               onPressed: () async {
-                                await readerBackgroundCubit.deleteLightBackground();
+                                await readerBackgroundCubit
+                                    .deleteLightBackground();
                                 await widget.readerCubit.reloadCurrentPage();
                               },
                             ),
@@ -1372,14 +1411,19 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              icon: Icon(backgroundState.darkBackgroundExists 
-                                  ? Icons.image 
-                                  : Icons.add_photo_alternate),
-                              label: Text(backgroundState.darkBackgroundExists 
-                                  ? '更新深色背景' 
-                                  : '设置深色背景'),
+                              icon: Icon(
+                                backgroundState.darkBackgroundExists
+                                    ? Icons.image
+                                    : Icons.add_photo_alternate,
+                              ),
+                              label: Text(
+                                backgroundState.darkBackgroundExists
+                                    ? l10n('更新深色背景')
+                                    : l10n('设置深色背景'),
+                              ),
                               onPressed: () async {
-                                await readerBackgroundCubit.updateDarkBackground();
+                                await readerBackgroundCubit
+                                    .updateDarkBackground();
                                 await widget.readerCubit.reloadCurrentPage();
                               },
                             ),
@@ -1388,9 +1432,10 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                           if (backgroundState.darkBackgroundExists)
                             OutlinedButton.icon(
                               icon: const Icon(Icons.delete),
-                              label: const Text('删除'),
+                              label: Text(l10n('删除')),
                               onPressed: () async {
-                                await readerBackgroundCubit.deleteDarkBackground();
+                                await readerBackgroundCubit
+                                    .deleteDarkBackground();
                                 await widget.readerCubit.reloadCurrentPage();
                               },
                             ),
@@ -1411,7 +1456,7 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                   await rightPaddingCubit.updatePadding(16);
                   await widget.readerCubit.reloadCurrentPage();
                 },
-                child: const Text('重置为默认'),
+                child: Text(l10n('重置为默认')),
               ),
             ],
           ),

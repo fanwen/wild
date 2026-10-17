@@ -9,6 +9,7 @@ import 'package:wild/src/rust/api/wenku8.dart';
 
 import 'home/bookshelf_page.dart';
 import 'home/history_page.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -36,8 +37,8 @@ class _HomePageState extends State<HomePage> {
       final signed = await autoSign();
       if (signed && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('今日已自动签到'),
+          SnackBar(
+            content: Text(l10n('今日已自动签到')),
             duration: Duration(seconds: 2),
           ),
         );
@@ -92,33 +93,33 @@ class _HomePageState extends State<HomePage> {
               selectedIndex: _currentIndex,
               onDestinationSelected: _onDestinationSelected,
               destinations: [
-                const NavigationDestination(
+                NavigationDestination(
                   icon: Icon(Icons.home_outlined),
                   selectedIcon: Icon(Icons.home),
-                  label: '首页',
+                  label: l10n('首页'),
                 ),
-                const NavigationDestination(
+                NavigationDestination(
                   icon: Icon(Icons.book_outlined),
                   selectedIcon: Icon(Icons.book),
-                  label: '书架',
+                  label: l10n('书架'),
                 ),
-                const NavigationDestination(
+                NavigationDestination(
                   icon: Icon(Icons.history_outlined),
                   selectedIcon: Icon(Icons.history),
-                  label: '历史',
+                  label: l10n('历史'),
                 ),
                 NavigationDestination(
                   icon: Badge(
                     isLabelVisible: state.updateInfo != null,
-                    label: const Text('新'),
+                    label: Text(l10n('新')),
                     child: const Icon(Icons.more_horiz_outlined),
                   ),
                   selectedIcon: Badge(
                     isLabelVisible: state.updateInfo != null,
-                    label: const Text('新'),
+                    label: Text(l10n('新')),
                     child: const Icon(Icons.more_horiz),
                   ),
-                  label: '更多',
+                  label: l10n('更多'),
                 ),
               ],
             ),
@@ -127,4 +128,4 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-} 
+}

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:wild/src/rust/api/wenku8.dart' show getSessionCookieString;
+import 'package:wild/l10n/ui_language.dart';
 
 /// 用 WKWebView 繞過 Cloudflare，執行單次動作（GET 或 POST form 提交）
 class CfActionLoader extends StatefulWidget {
   final String apiHost;
+
   /// GET 模式：提供相對路徑，例如 /modules/article/addbookcase.php?bid=123
   final String? actionPath;
+
   /// POST 模式：在 cookies 注入後執行的 JS（建立 form 並 submit）
   final String? jsAction;
   final String successUrlKeyword; // URL 包含此字串視為成功
@@ -23,7 +26,10 @@ class CfActionLoader extends StatefulWidget {
     required this.successBodyKeyword,
     required this.onSuccess,
     required this.onError,
-  }) : assert(actionPath != null || jsAction != null, 'actionPath 或 jsAction 必須提供其中一個');
+  }) : assert(
+         actionPath != null || jsAction != null,
+         'actionPath 或 jsAction 必須提供其中一個',
+       );
 
   @override
   State<CfActionLoader> createState() => _CfActionLoaderState();
@@ -37,18 +43,21 @@ class _CfActionLoaderState extends State<CfActionLoader> {
   @override
   void initState() {
     super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: _onPageFinished,
-        onWebResourceError: (err) {
-          if (!_done) {
-            _done = true;
-            widget.onError('WebView 載入失敗: ${err.description}');
-          }
-        },
-      ))
-      ..loadRequest(Uri.parse('${widget.apiHost}/'));
+    _controller =
+        WebViewController()
+          ..setJavaScriptMode(JavaScriptMode.unrestricted)
+          ..setNavigationDelegate(
+            NavigationDelegate(
+              onPageFinished: _onPageFinished,
+              onWebResourceError: (err) {
+                if (!_done) {
+                  _done = true;
+                  widget.onError('${l10n('WebView 载入失败: ')}${err.description}');
+                }
+              },
+            ),
+          )
+          ..loadRequest(Uri.parse('${widget.apiHost}/'));
   }
 
   Future<void> _onPageFinished(String url) async {
@@ -87,9 +96,9 @@ class _CfActionLoaderState extends State<CfActionLoader> {
         await _controller.runJavaScript(widget.jsAction!);
       } else {
         // GET 模式：直接導航
-        await _controller.loadRequest(Uri.parse(
-          '${widget.apiHost}${widget.actionPath}',
-        ));
+        await _controller.loadRequest(
+          Uri.parse('${widget.apiHost}${widget.actionPath}'),
+        );
       }
       return;
     }
@@ -117,12 +126,12 @@ class _CfActionLoaderState extends State<CfActionLoader> {
       if (!_done) {
         _done = true;
         final preview = text.length > 200 ? text.substring(0, 200) : text;
-        widget.onError('操作失敗: $preview');
+        widget.onError('${l10n('操作失败: ')}$preview');
       }
     } catch (e) {
       if (!_done) {
         _done = true;
-        widget.onError('解析結果失敗: $e');
+        widget.onError('${l10n('解析结果失败: ')}$e');
       }
     }
   }
@@ -133,16 +142,22 @@ class _CfActionLoaderState extends State<CfActionLoader> {
       children: [
         // WebView 隱藏在角落，不顯示給使用者
         Positioned(
-          left: 0, top: 0, width: 1, height: 1,
+          left: 0,
+          top: 0,
+          width: 1,
+          height: 1,
           child: WebViewWidget(controller: _controller),
         ),
-        const Center(
+        Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 16),
-              Text('正在處理，請稍候...', style: TextStyle(fontSize: 14, color: Colors.grey)),
+              Text(
+                l10n('正在处理，请稍候...'),
+                style: TextStyle(fontSize: 14, color: Colors.grey),
+              ),
             ],
           ),
         ),

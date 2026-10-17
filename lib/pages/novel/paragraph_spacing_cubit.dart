@@ -28,4 +28,4 @@ class ParagraphSpacingCubit extends Cubit<double> {
       emit(spacing);
     }
   }
-} 
+}

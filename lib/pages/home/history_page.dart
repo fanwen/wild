@@ -5,6 +5,8 @@ import 'package:wild/widgets/cached_image.dart';
 import 'package:intl/intl.dart';
 
 import 'history_cubit.dart';
+import 'package:wild/l10n/ui_language.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class HistoryPage extends StatelessWidget {
   const HistoryPage({super.key});
@@ -13,7 +15,7 @@ class HistoryPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('阅读历史'),
+        title: Text(l10n('阅读历史')),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
@@ -22,16 +24,16 @@ class HistoryPage extends StatelessWidget {
                 context: context,
                 builder:
                     (context) => AlertDialog(
-                      title: const Text('清空历史'),
-                      content: const Text('确定要清空所有阅读历史吗？此操作不可恢复。'),
+                      title: Text(l10n('清空历史')),
+                      content: Text(l10n('确定要清空所有阅读历史吗？此操作不可恢复。')),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context, false),
-                          child: const Text('取消'),
+                          child: Text(l10n('取消')),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(context, true),
-                          child: const Text('确定'),
+                          child: Text(l10n('确定')),
                         ),
                       ],
                     ),
@@ -53,11 +55,11 @@ class HistoryPage extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           if (state is HistoryError) {
-            return Center(child: Text('加载失败: ${state.message}'));
+            return Center(child: Text('${l10n('加载失败: ')}${state.message}'));
           }
           if (state is HistoryLoaded) {
             if (state.histories.isEmpty) {
-              return const Center(child: Text('暂无阅读历史'));
+              return Center(child: Text(l10n('暂无阅读历史')));
             }
             return RefreshIndicator(
               onRefresh: () => context.read<HistoryCubit>().load(),
@@ -88,12 +90,14 @@ class _HistoryItem extends StatelessWidget {
     int _asMsInt(Object? v) {
       if (v == null) return 0;
       if (v is int) return v;
-      if (v is BigInt) return v.toInt();     // 轉成 int 給 DateTime 用
-      if (v is String) return int.parse(v);  // 以防是字串
+      if (v is BigInt) return v.toInt(); // 轉成 int 給 DateTime 用
+      if (v is String) return int.parse(v); // 以防是字串
       throw ArgumentError('Unsupported type for timestamp: ${v.runtimeType}');
     }
 
-    final lastReadAt = DateTime.fromMillisecondsSinceEpoch(_asMsInt(history.lastReadAt));
+    final lastReadAt = DateTime.fromMillisecondsSinceEpoch(
+      _asMsInt(history.lastReadAt),
+    );
     final colorScheme = Theme.of(context).colorScheme;
     final historyCubit = context.read<HistoryCubit>();
 
@@ -113,43 +117,46 @@ class _HistoryItem extends StatelessWidget {
         onLongPress: () {
           showDialog(
             context: context,
-            builder: (dialogContext) => AlertDialog(
-              title: const Text('删除历史记录'),
-              content: Text('确定要删除《${history.novelName}》的阅读历史吗？'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('取消'),
+            builder:
+                (dialogContext) => AlertDialog(
+                  title: Text(l10n('删除历史记录')),
+                  content: Text(
+                    '${l10n('确定要删除《')}${cv(history.novelName)}${l10n('》的阅读历史吗？')}',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext),
+                      child: Text(l10n('取消')),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        Navigator.pop(dialogContext);
+                        try {
+                          await historyCubit.deleteHistory(history.novelId);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(l10n('已删除阅读历史')),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          print("$e");
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('${l10n('删除失败: ')}$e'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Text(l10n('确定')),
+                    ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: () async {
-                    Navigator.pop(dialogContext);
-                    try {
-                      await historyCubit.deleteHistory(history.novelId);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('已删除阅读历史'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      print("$e");
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('删除失败: $e'),
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('确定'),
-                ),
-              ],
-            ),
           );
         },
         child: Padding(
@@ -170,19 +177,19 @@ class _HistoryItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      history.novelName,
+                      cv(history.novelName),
                       style: Theme.of(context).textTheme.titleMedium,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '作者：${history.author}',
+                      '${l10n('作者：')}${cv(history.author)}',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '最后阅读：${dateFormat.format(lastReadAt)}',
+                      '${l10n('最后阅读：')}${dateFormat.format(lastReadAt)}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -192,18 +199,22 @@ class _HistoryItem extends StatelessWidget {
                       onTap: () async {
                         try {
                           // 获取小说信息和章节信息
-                          final novelInfo = await w8.novelInfo(aid: history.novelId);
-                          final volumes = await w8.novelReader(aid: history.novelId);
-                          
+                          final novelInfo = await w8.novelInfo(
+                            aid: history.novelId,
+                          );
+                          final volumes = await w8.novelReader(
+                            aid: history.novelId,
+                          );
+
                           if (!context.mounted) return;
-                          
+
                           await Navigator.pushNamed(
                             context,
                             '/novel/reader',
                             arguments: {
                               'novelId': history.novelId,
                               'chapterId': history.chapterId,
-                              'title': history.chapterTitle,
+                              'title': cv(history.chapterTitle),
                               'volumes': volumes,
                               'novelInfo': novelInfo,
                               'initialPage': history.progressPage,
@@ -218,7 +229,7 @@ class _HistoryItem extends StatelessWidget {
                           // 显示错误提示
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
-                              content: Text('加载失败: $e'),
+                              content: Text('${l10n('加载失败: ')}$e'),
                               duration: const Duration(seconds: 2),
                               behavior: SnackBarBehavior.floating,
                               margin: const EdgeInsets.only(bottom: 16),
@@ -251,7 +262,8 @@ class _HistoryItem extends StatelessWidget {
                               ),
                               const TextSpan(text: ' '),
                               TextSpan(
-                                text: '继续阅读 - ${history.chapterTitle}',
+                                text:
+                                    '${l10n('继续阅读 - ')}${cv(history.chapterTitle)}',
                                 style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(color: colorScheme.primary),
                               ),

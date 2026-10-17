@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import '../src/rust/api/database.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 const key = "_screenUpOnScrollProperty";
 var _screenUpOnScrollProperty = true;
@@ -23,7 +24,7 @@ Widget screenUpOnScrollSetting() {
     return StatefulBuilder(
       builder: (BuildContext context, void Function(void Function()) setState) {
         return SwitchListTile(
-          title: Text("滚屏时保持亮屏"),
+          title: Text(l10n("滚屏时保持亮屏")),
           value: _screenUpOnScrollProperty,
           onChanged: (v) {
             setState(() {

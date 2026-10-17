@@ -6,6 +6,8 @@ import 'package:wild/pages/novel/novel_download_info_cubit.dart';
 import 'package:wild/pages/novel/reader_page.dart';
 import 'package:wild/src/rust/wenku8/models.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:wild/l10n/ui_language.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class NovelDownloadInfoPage extends StatelessWidget {
   final String novelId;
@@ -18,7 +20,7 @@ class NovelDownloadInfoPage extends StatelessWidget {
       create: (context) => NovelDownloadInfoCubit(novelId)..load(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('下载详情'),
+          title: Text(l10n('下载详情')),
           actions: [
             BlocBuilder<NovelDownloadInfoCubit, NovelDownloadInfoState>(
               builder: (context, state) {
@@ -32,16 +34,16 @@ class NovelDownloadInfoPage extends StatelessWidget {
                       context: context,
                       builder:
                           (context) => AlertDialog(
-                            title: const Text('确认删除'),
-                            content: const Text('确定要删除这本小说的下载内容吗？'),
+                            title: Text(l10n('确认删除')),
+                            content: Text(l10n('确定要删除这本小说的下载内容吗？')),
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(context, false),
-                                child: const Text('取消'),
+                                child: Text(l10n('取消')),
                               ),
                               TextButton(
                                 onPressed: () => Navigator.pop(context, true),
-                                child: const Text('删除'),
+                                child: Text(l10n('删除')),
                               ),
                             ],
                           ),
@@ -76,7 +78,7 @@ class NovelDownloadInfoPage extends StatelessWidget {
                       onPressed: () {
                         context.read<NovelDownloadInfoCubit>().load();
                       },
-                      child: const Text('重试'),
+                      child: Text(l10n('重试')),
                     ),
                   ],
                 ),
@@ -134,14 +136,14 @@ class _NovelDownloadInfoContent extends StatelessWidget {
               initialTitle: title,
               volumes: volumes,
               novelInfo: NovelInfo(
-                title: download.novelName,
+                title: cv(download.novelName),
                 author: download.author,
                 status: download.status,
                 imgUrl: download.coverUrl,
                 introduce: download.introduce,
                 finUpdate: download.finUpdate,
                 isAnimated: download.isAnimated,
-                tags: download.tags.split(','),
+                tags: cvAll(download.tags.split(',')),
                 trending: download.trending,
                 heat: '',
               ),
@@ -169,17 +171,17 @@ class _NovelDownloadInfoContent extends StatelessWidget {
               children: [
                 _StatItem(
                   icon: Icons.update,
-                  label: '更新',
+                  label: l10n('更新'),
                   value: download.finUpdate,
                 ),
                 _StatItem(
                   icon: Icons.local_fire_department,
-                  label: '热度',
+                  label: l10n('热度'),
                   value: download.trending,
                 ),
                 _StatItem(
                   icon: Icons.download,
-                  label: '下载进度',
+                  label: l10n('下载进度'),
                   value:
                       '${download.downloadChapterCount}/${download.chooseChapterCount}',
                 ),
@@ -187,7 +189,9 @@ class _NovelDownloadInfoContent extends StatelessWidget {
             ),
           ),
         ),
-        SliverToBoxAdapter(child: _NovelTags(tags: download.tags.split(','))),
+        SliverToBoxAdapter(
+          child: _NovelTags(tags: cvAll(download.tags.split(','))),
+        ),
         // 添加继续阅读按钮
         if (readingHistory != null)
           SliverToBoxAdapter(
@@ -204,10 +208,12 @@ class _NovelDownloadInfoContent extends StatelessWidget {
                       context,
                       readingHistory!.novelId,
                       readingHistory!.chapterId,
-                      readingHistory!.novelName,
+                      cv(readingHistory!.novelName),
                     ),
                 icon: const Icon(Icons.book),
-                label: Text('继续阅读 - ${readingHistory!.chapterTitle}'),
+                label: Text(
+                  '${l10n('继续阅读 - ')}${cv(readingHistory!.chapterTitle)}',
+                ),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
@@ -227,7 +233,7 @@ class _NovelDownloadInfoContent extends StatelessWidget {
                     context,
                     chapter.aid,
                     chapter.cid,
-                    chapter.title,
+                    cv(chapter.title),
                   ),
             );
           }, childCount: volumes.length),
@@ -265,24 +271,24 @@ class _NovelHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  download.novelName,
+                  cv(download.novelName),
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '作者：${download.author}',
+                  '${l10n('作者：')}${download.author}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '状态：${download.status}',
+                  '${l10n('状态：')}${download.status}',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 if (download.isAnimated)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      '动画化',
+                      l10n('动画化'),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.primary,
                       ),
@@ -332,15 +338,15 @@ class _NovelHeader extends StatelessWidget {
   String _getStatusText(int status) {
     switch (status) {
       case 0: // DOWNLOAD_STATUS_NOT_DOWNLOAD
-        return '等待下载';
+        return l10n('等待下载');
       case 1: // DOWNLOAD_STATUS_SUCCESS
-        return '下载完成';
+        return l10n('下载完成');
       case 2: // DOWNLOAD_STATUS_FAILED
-        return '下载失败';
+        return l10n('下载失败');
       case 3: // DOWNLOAD_STATUS_DELETING
-        return '正在删除';
+        return l10n('正在删除');
       default:
-        return '未知状态';
+        return l10n('未知状态');
     }
   }
 }
@@ -381,7 +387,7 @@ class _NovelDescription extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('简介', style: Theme.of(context).textTheme.titleMedium),
+          Text(l10n('简介'), style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           Html(
             data: description,
@@ -464,7 +470,7 @@ class _VolumeItem extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        chapter.title,
+                        cv(chapter.title),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),

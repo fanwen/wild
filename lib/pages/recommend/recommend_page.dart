@@ -1,3 +1,4 @@
+import 'package:wild/l10n/content_language.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:wild/src/rust/api/wenku8.dart' as w8;
@@ -5,6 +6,7 @@ import 'package:wild/src/rust/wenku8/models.dart' as w8;
 import 'package:wild/widgets/novel_card.dart';
 
 import '../home/recommend_cubit.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 class RecommendPage extends StatelessWidget {
   const RecommendPage({super.key});
@@ -25,7 +27,7 @@ class RecommendPage extends StatelessWidget {
                 SizedBox(
                   height: MediaQuery.of(context).size.height - 100,
                   child: Center(
-                    child: Text('加载失败 (下拉刷新): ${state.message}'),
+                    child: Text('${l10n('加载失败 (下拉刷新): ')}${state.message}'),
                   ),
                 ),
               ],
@@ -65,10 +67,10 @@ class _HomeBlockWidget extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            block.title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            cv(block.title),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
         Padding(
@@ -101,4 +103,4 @@ class _HomeBlockWidget extends StatelessWidget {
       ],
     );
   }
-} 
+}

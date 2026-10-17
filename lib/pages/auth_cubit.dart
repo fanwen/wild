@@ -1,3 +1,4 @@
+import 'package:wild/l10n/ui_language.dart';
 import 'dart:typed_data';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -5,6 +6,7 @@ import 'package:equatable/equatable.dart';
 import 'package:wild/src/rust/api/wenku8.dart';
 
 enum AuthStatus { initial, authenticated, unauthenticated, loading, error }
+
 enum CheckcodeStatus { initial, loading, success, error }
 
 class AuthState extends Equatable {
@@ -23,7 +25,13 @@ class AuthState extends Equatable {
   });
 
   @override
-  List<Object?> get props => [status, username, errorMessage, checkcode, checkcodeStatus];
+  List<Object?> get props => [
+    status,
+    username,
+    errorMessage,
+    checkcode,
+    checkcodeStatus,
+  ];
 }
 
 class AuthCubit extends Cubit<AuthState> {
@@ -58,18 +66,22 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future loadCheckcode() async {
-    emit(AuthState(
-      status: state.status,
-      checkcode: Uint8List(0),
-      checkcodeStatus: CheckcodeStatus.loading,
-    ));
+    emit(
+      AuthState(
+        status: state.status,
+        checkcode: Uint8List(0),
+        checkcodeStatus: CheckcodeStatus.loading,
+      ),
+    );
     try {
       final checkcode = await downloadCheckcode();
-      emit(AuthState(
-        status: state.status,
-        checkcode: checkcode,
-        checkcodeStatus: CheckcodeStatus.success,
-      ));
+      emit(
+        AuthState(
+          status: state.status,
+          checkcode: checkcode,
+          checkcodeStatus: CheckcodeStatus.success,
+        ),
+      );
       print("checkcode loaded : ${checkcode}");
     } catch (e, s) {
       print("2");
@@ -79,7 +91,7 @@ class AuthCubit extends Cubit<AuthState> {
           status: state.status,
           checkcode: null,
           checkcodeStatus: CheckcodeStatus.error,
-          errorMessage: "无法成功获取验证码，请检查网络",
+          errorMessage: l10n('无法成功获取验证码，请检查网络'),
         ),
       );
     }

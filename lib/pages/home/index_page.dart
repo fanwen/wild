@@ -1,3 +1,4 @@
+import 'package:wild/l10n/content_language.dart';
 import 'package:flutter/material.dart';
 import 'package:wild/widgets/novel_cover_card.dart';
 
@@ -8,6 +9,7 @@ import '../../widgets/cached_image.dart';
 import 'category_page.dart';
 import 'recommend_page.dart';
 import '../search_page.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 class IndexPage extends StatefulWidget {
   const IndexPage({super.key});
@@ -36,11 +38,11 @@ class _IndexPageState extends State<IndexPage>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('轻小说文库'),
+        title: Text(l10n('轻小说文库')),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
-            tooltip: '搜索',
+            tooltip: l10n('搜索'),
             onPressed: () {
               Navigator.push(
                 context,
@@ -51,11 +53,11 @@ class _IndexPageState extends State<IndexPage>
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: '推荐'),
-            Tab(text: '分类'),
-            Tab(text: '排行'),
-            Tab(text: '完结'),
+          tabs: [
+            Tab(text: l10n('推荐')),
+            Tab(text: l10n('分类')),
+            Tab(text: l10n('排行')),
+            Tab(text: l10n('完结')),
           ],
         ),
       ),
@@ -85,7 +87,7 @@ class _HomeBlockWidget extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            block.title,
+            cv(block.title),
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -227,7 +229,7 @@ class _ToplistPageState extends State<ToplistPage> {
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: FilterChip(
-                        label: Text(label),
+                        label: Text(l10n(label)),
                         selected: _selectedSort == value,
                         onSelected: (selected) {
                           if (selected) {
@@ -266,7 +268,7 @@ class _ToplistPageState extends State<ToplistPage> {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                '加载失败 (下拉刷新)',
+                                l10n('加载失败 (下拉刷新)'),
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                               const SizedBox(height: 8),
@@ -387,73 +389,74 @@ class _ArticlelistPageState extends State<ArticlelistPage> {
   Widget build(BuildContext context) {
     return _errorMessage != null
         ? RefreshIndicator(
-            onRefresh: () => _loadArticlelist(refresh: true),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                SizedBox(
-                  height: MediaQuery.of(context).size.height - 100,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 48,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '加载失败 (下拉刷新)',
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _errorMessage!,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                        textAlign: TextAlign.start,
-                      ),
-                    ],
-                  ),
+          onRefresh: () => _loadArticlelist(refresh: true),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              SizedBox(
+                height: MediaQuery.of(context).size.height - 100,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      l10n('加载失败 (下拉刷新)'),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _errorMessage!,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      textAlign: TextAlign.start,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          )
+              ),
+            ],
+          ),
+        )
         : _currentPage == null
-            ? const Center(child: CircularProgressIndicator())
-            : NotificationListener<ScrollNotification>(
-                onNotification: (notification) {
-                  if (notification is ScrollEndNotification &&
-                      notification.metrics.pixels >=
-                          notification.metrics.maxScrollExtent - 200 &&
-                      !_isLoading &&
-                      _currentPage!.currentPage < _currentPage!.maxPage) {
-                    _loadArticlelist();
-                  }
-                  return true;
-                },
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(8),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 207 / 307,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
+        ? const Center(child: CircularProgressIndicator())
+        : NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification is ScrollEndNotification &&
+                notification.metrics.pixels >=
+                    notification.metrics.maxScrollExtent - 200 &&
+                !_isLoading &&
+                _currentPage!.currentPage < _currentPage!.maxPage) {
+              _loadArticlelist();
+            }
+            return true;
+          },
+          child: GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              childAspectRatio: 207 / 307,
+              crossAxisSpacing: 8,
+              mainAxisSpacing: 8,
+            ),
+            itemCount:
+                _currentPage!.records.length +
+                (_currentPage!.currentPage < _currentPage!.maxPage ? 1 : 0),
+            itemBuilder: (context, index) {
+              if (index >= _currentPage!.records.length) {
+                return const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CircularProgressIndicator(),
                   ),
-                  itemCount: _currentPage!.records.length +
-                      (_currentPage!.currentPage < _currentPage!.maxPage ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index >= _currentPage!.records.length) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    }
-                    final novel = _currentPage!.records[index] as NovelCover;
-                    return NovelCoverCard(novel: novel);
-                  },
-                ),
-              );
+                );
+              }
+              final novel = _currentPage!.records[index] as NovelCover;
+              return NovelCoverCard(novel: novel);
+            },
+          ),
+        );
   }
 }

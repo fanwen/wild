@@ -32,4 +32,4 @@ class RecommendCubit extends Cubit<RecommendState> {
       emit(RecommendError(e.toString()));
     }
   }
-} 
+}

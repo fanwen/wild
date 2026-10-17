@@ -1,6 +1,3 @@
-
-
-
 import 'dart:async';
 import 'dart:io';
 
@@ -15,7 +12,7 @@ const _methodChannel = MethodChannel('methods');
 final keyboardController = false;
 
 Event<ReaderControllerEventArgs> readerControllerEvent =
-Event<ReaderControllerEventArgs>();
+    Event<ReaderControllerEventArgs>();
 
 class ReaderControllerEventArgs extends EventArgs {
   final String key;
@@ -36,8 +33,7 @@ Widget readerKeyboardHolder(Widget widget) {
             readerControllerEvent.broadcast(ReaderControllerEventArgs("UP"));
           }
           if (event.isKeyPressed(LogicalKeyboardKey.arrowDown)) {
-            readerControllerEvent
-                .broadcast(ReaderControllerEventArgs("DOWN"));
+            readerControllerEvent.broadcast(ReaderControllerEventArgs("DOWN"));
           }
         }
       },
@@ -62,8 +58,9 @@ StreamSubscription? volumeS;
 void addVolumeListen() {
   _volumeListenCount++;
   if (_volumeListenCount == 1) {
-    volumeS =
-        volumeButtonChannel.receiveBroadcastStream().listen(_onVolumeEvent);
+    volumeS = volumeButtonChannel.receiveBroadcastStream().listen(
+      _onVolumeEvent,
+    );
     // 確保 WebView 不會覆蓋 AVAudioSession 設定
     if (Platform.isIOS) {
       Future.delayed(const Duration(milliseconds: 300), () {

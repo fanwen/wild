@@ -6,4 +6,4 @@ class FullscreenCubit extends Cubit<bool> {
   void toggle() {
     emit(!state);
   }
-} 
+}

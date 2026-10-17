@@ -3,16 +3,14 @@ import 'package:wild/src/rust/api/wenku8.dart';
 import 'package:wild/src/rust/wenku8/models.dart';
 import 'package:wild/widgets/cached_image.dart';
 import 'package:intl/intl.dart';
+import 'package:wild/l10n/ui_language.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class ReviewsPage extends StatefulWidget {
   final String aid;
   final String title;
 
-  const ReviewsPage({
-    super.key,
-    required this.aid,
-    required this.title,
-  });
+  const ReviewsPage({super.key, required this.aid, required this.title});
 
   @override
   State<ReviewsPage> createState() => _ReviewsPageState();
@@ -68,9 +66,7 @@ class _ReviewsPageState extends State<ReviewsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${widget.title} - 评论'),
-      ),
+      appBar: AppBar(title: Text('${cv(widget.title)}${l10n(' - 评论')}')),
       body: _buildBody(),
     );
   }
@@ -85,7 +81,7 @@ class _ReviewsPageState extends State<ReviewsPage> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => _loadReviews(refresh: true),
-              child: const Text('重试'),
+              child: Text(l10n('重试')),
             ),
           ],
         ),
@@ -97,16 +93,19 @@ class _ReviewsPageState extends State<ReviewsPage> {
     }
 
     if (_currentPage!.records.isEmpty) {
-      return const Center(child: Text('暂无评论'));
+      return Center(child: Text(l10n('暂无评论')));
     }
 
     return RefreshIndicator(
       onRefresh: () => _loadReviews(refresh: true),
       child: ListView.builder(
-        itemCount: _currentPage!.records.length + (_currentPage!.currentPage < _currentPage!.maxPage ? 1 : 0),
+        itemCount:
+            _currentPage!.records.length +
+            (_currentPage!.currentPage < _currentPage!.maxPage ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == _currentPage!.records.length) {
-            if (!_isLoading && _currentPage!.currentPage < _currentPage!.maxPage) {
+            if (!_isLoading &&
+                _currentPage!.currentPage < _currentPage!.maxPage) {
               Future.microtask(() => _loadReviews());
               return const Center(
                 child: Padding(
@@ -128,16 +127,14 @@ class _ReviewsPageState extends State<ReviewsPage> {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        child: const Icon(Icons.person),
-                      ),
+                      CircleAvatar(child: const Icon(Icons.person)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              review.uname,
+                              cv(review.uname),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             Text(
@@ -151,7 +148,7 @@ class _ReviewsPageState extends State<ReviewsPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    review.content,
+                    cv(review.content),
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
@@ -162,4 +159,4 @@ class _ReviewsPageState extends State<ReviewsPage> {
       ),
     );
   }
-} 
+}

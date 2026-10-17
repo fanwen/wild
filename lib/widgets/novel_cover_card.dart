@@ -1,7 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:wild/src/rust/wenku8/models.dart';
 import 'package:wild/widgets/cached_image.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class NovelCoverCard extends StatelessWidget {
   final NovelCover novel;
@@ -21,7 +21,7 @@ class NovelCoverCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(4.0),
             child: Text(
-              novel.title,
+              cv(novel.title),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
@@ -38,4 +38,3 @@ class NovelCoverCard extends StatelessWidget {
     );
   }
 }
-

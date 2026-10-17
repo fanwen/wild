@@ -1,3 +1,4 @@
+import 'package:wild/l10n/ui_language.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import '../src/rust/api/wenku8.dart';
@@ -34,7 +35,14 @@ class CategoryLoaded extends CategoryState {
   });
 
   @override
-  List<Object?> get props => [novels, tagGroups, selectedTag, viewMode, hasMore, currentPage];
+  List<Object?> get props => [
+    novels,
+    tagGroups,
+    selectedTag,
+    viewMode,
+    hasMore,
+    currentPage,
+  ];
 
   CategoryLoaded copyWith({
     List<Novel>? novels,
@@ -85,12 +93,14 @@ class CategoryCubit extends Cubit<CategoryState> {
     if (state is CategoryLoaded) {
       final currentState = state as CategoryLoaded;
       if (currentState.viewMode != viewMode) {
-        emit(currentState.copyWith(
-          viewMode: viewMode,
-          novels: [],
-          currentPage: 1,
-          hasMore: true,
-        ));
+        emit(
+          currentState.copyWith(
+            viewMode: viewMode,
+            novels: [],
+            currentPage: 1,
+            hasMore: true,
+          ),
+        );
         loadNovels(refresh: true);
       }
     }
@@ -109,9 +119,9 @@ class CategoryCubit extends Cubit<CategoryState> {
     try {
       final page = refresh ? 1 : currentState.currentPage;
       final selectedTag = currentState.selectedTag;
-      
+
       if (selectedTag == null) {
-        emit(CategoryError('请先选择一个标签'));
+        emit(CategoryError(l10n('请先选择一个标签')));
         return;
       }
 
@@ -121,32 +131,42 @@ class CategoryCubit extends Cubit<CategoryState> {
         pageNumber: page,
       );
 
-      final novels = result.records.map((cover) => Novel(
-        id: cover.aid,
-        title: cover.title,
-        author: '',
-        coverUrl: cover.img,
-        lastChapter: '',
-        tags: [],
-      )).toList();
+      final novels =
+          result.records
+              .map(
+                (cover) => Novel(
+                  id: cover.aid,
+                  title: cover.title,
+                  author: '',
+                  coverUrl: cover.img,
+                  lastChapter: '',
+                  tags: [],
+                ),
+              )
+              .toList();
       final hasMore = novels.isNotEmpty;
 
       if (state is CategoryLoaded) {
         final currentState = state as CategoryLoaded;
-        final updatedNovels = refresh ? novels : [...currentState.novels, ...novels];
-        emit(currentState.copyWith(
-          novels: updatedNovels,
-          currentPage: page + 1,
-          hasMore: hasMore,
-        ));
+        final updatedNovels =
+            refresh ? novels : [...currentState.novels, ...novels];
+        emit(
+          currentState.copyWith(
+            novels: updatedNovels,
+            currentPage: page + 1,
+            hasMore: hasMore,
+          ),
+        );
       } else {
-        emit(CategoryLoaded(
-          novels: novels,
-          tagGroups: currentState.tagGroups,
-          selectedTag: selectedTag,
-          currentPage: page + 1,
-          hasMore: hasMore,
-        ));
+        emit(
+          CategoryLoaded(
+            novels: novels,
+            tagGroups: currentState.tagGroups,
+            selectedTag: selectedTag,
+            currentPage: page + 1,
+            hasMore: hasMore,
+          ),
+        );
       }
     } catch (e) {
       emit(CategoryError(e.toString()));
@@ -157,14 +177,16 @@ class CategoryCubit extends Cubit<CategoryState> {
     if (state is CategoryLoaded) {
       final currentState = state as CategoryLoaded;
       if (currentState.selectedTag != tag) {
-        emit(currentState.copyWith(
-          selectedTag: tag,
-          novels: [],
-          currentPage: 1,
-          hasMore: true,
-        ));
+        emit(
+          currentState.copyWith(
+            selectedTag: tag,
+            novels: [],
+            currentPage: 1,
+            hasMore: true,
+          ),
+        );
         loadNovels(refresh: true);
       }
     }
   }
-} 
+}

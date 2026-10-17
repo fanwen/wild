@@ -981,13 +981,8 @@ impl Wenku8Client {
     pub async fn c_content(&self, aid: &str, cid: &str) -> Result<String> {
         let aid_num: u64 = aid.parse().unwrap_or(0);
         let sub_dir = aid_num / 1000;
-        let url = format!(
-            "{}/novel/{}/{}/{}.htm",
-            self.load_api_host().await,
-            sub_dir,
-            aid,
-            cid
-        );
+        let api_host = self.load_api_host().await;
+        let url = format!("{}/novel/{}/{}/{}.htm", api_host, sub_dir, aid, cid);
         let ua = self.load_user_agent().await;
         let headers = Self::default_headers_sync(&ua);
         let response = self
@@ -1009,13 +1004,14 @@ impl Wenku8Client {
             .next()
             .ok_or_else(|| anyhow!("Failed to find #content in chapter page"))?;
 
-        // Build plain text: skip <ul> watermark, convert <br> to newline
+        // Build plain text: skip <ul> watermark, convert <br> to newline,
+        // turn illustrations into <!--image-->URL<!--image--> markers (Dart 侧按标记分页)
         let mut result = String::new();
-        Self::extract_content_text(content, &mut result);
+        Self::extract_content_text(content, &mut result, &api_host);
         Ok(result.trim().to_string())
     }
 
-    fn extract_content_text(element: ElementRef, buf: &mut String) {
+    pub(crate) fn extract_content_text(element: ElementRef, buf: &mut String, api_host: &str) {
         use scraper::Node;
         for child in element.children() {
             match child.value() {
@@ -1033,12 +1029,99 @@ impl Wenku8Client {
                         buf.push('\n');
                         continue;
                     }
+                    if name == "img" {
+                        // 站点用 <div class="divimage"><a href="…"><img src="…" class="imagecontent"></a></div>
+                        // 图片来源优先 src，兼容 data-src / 外层 title
+                        if let Some(url) = Self::image_url_from_element(e, api_host) {
+                            Self::push_image_marker(buf, &url);
+                        }
+                        continue;
+                    }
+                    if name == "div" && Self::has_class(e, "divimage") {
+                        // 插图容器：地址可能直接写在 title 上（此时不再递归，避免重复出图）
+                        if let Some(raw) = e.attr("title") {
+                            if let Some(url) = Self::normalize_image_url(raw, api_host) {
+                                Self::push_image_marker(buf, &url);
+                                continue;
+                            }
+                        }
+                    }
                     let child_ref = ElementRef::wrap(child).unwrap();
-                    Self::extract_content_text(child_ref, buf);
+                    Self::extract_content_text(child_ref, buf, api_host);
                 }
                 _ => {}
             }
         }
+    }
+
+    fn has_class(element: &scraper::node::Element, class: &str) -> bool {
+        element
+            .attr("class")
+            .map(|value| value.split_whitespace().any(|c| c == class))
+            .unwrap_or(false)
+    }
+
+    fn image_url_from_element(
+        element: &scraper::node::Element,
+        api_host: &str,
+    ) -> Option<String> {
+        // 优先取绝对地址（多个属性时别被相对占位符带偏），没有绝对地址再退回相对路径
+        let mut relative: Option<String> = None;
+        for attr in ["src", "data-src", "data-original", "file", "title"] {
+            let Some(raw) = element.attr(attr) else { continue };
+            let raw = raw.trim();
+            if raw.is_empty() || raw.starts_with("data:") {
+                continue;
+            }
+            let lower = raw.to_ascii_lowercase();
+            if lower.starts_with("http://")
+                || lower.starts_with("https://")
+                || raw.starts_with("//")
+            {
+                return Self::normalize_image_url(raw, api_host);
+            }
+            if relative.is_none() {
+                relative = Self::normalize_image_url(raw, api_host);
+            }
+        }
+        relative
+    }
+
+    /// 把章节页里的图片地址补成可下载的绝对地址。
+    /// 站点现在直接给绝对地址（如 https://pic.777743.xyz/1/1269/40162/48046.jpg），
+    /// 这里只兜底相对路径（历史上的 /image/… 走独立图片主机）。
+    fn normalize_image_url(raw: &str, api_host: &str) -> Option<String> {
+        let raw = raw.trim();
+        if raw.is_empty() || raw.starts_with("data:") {
+            return None;
+        }
+        let lower = raw.to_ascii_lowercase();
+        if lower.starts_with("http://") || lower.starts_with("https://") {
+            return Some(raw.to_string());
+        }
+        if let Some(rest) = raw.strip_prefix("//") {
+            return Some(format!("https://{rest}"));
+        }
+        let path = raw
+            .trim_start_matches("./")
+            .trim_start_matches('/')
+            .to_string();
+        if path.is_empty() {
+            return None;
+        }
+        if path.starts_with("image/") {
+            return Some(format!("http://img.wenku8.com/{path}"));
+        }
+        Some(format!("{}/{}", api_host.trim_end_matches('/'), path))
+    }
+
+    fn push_image_marker(buf: &mut String, url: &str) {
+        if !buf.is_empty() && !buf.ends_with('\n') {
+            buf.push('\n');
+        }
+        buf.push_str("<!--image-->");
+        buf.push_str(url);
+        buf.push_str("<!--image-->\n");
     }
 
     pub async fn toplist(&self, sort: &str, page: i32) -> Result<PageStats<NovelCover>> {
@@ -1411,12 +1494,14 @@ impl Wenku8Client {
         let _ = self.init_session().await;
         let search_key = gbk_url_encode(search_key);
         let url = format!(
-            "{}/modules/article/search.php?searchtype={search_type}&searchkey={search_key}&page={page}&charset=gbk",self.load_api_host().await
+            "{}{}",
+            self.load_api_host().await,
+            Self::search_path_encoded(search_type, &search_key, page)
         );
         let response = self
             .client
             .get(url)
-            .header("User-Agent", self.load_user_agent().await)
+            .headers(Self::default_headers_sync(&self.load_user_agent().await))
             .send()
             .await?;
         if !response.status().is_success() {
@@ -1430,6 +1515,18 @@ impl Wenku8Client {
         let text = decode_gbk(text)?;
         Self::parse_search(text.as_str())
     }
+
+    /// 搜索页的路径（searchkey 要先用 GBK 百分号编码）。
+    pub fn search_path(&self, search_type: &str, search_key: &str, page: i32) -> String {
+        Self::search_path_encoded(search_type, &gbk_url_encode(search_key), page)
+    }
+
+    fn search_path_encoded(search_type: &str, search_key_encoded: &str, page: i32) -> String {
+        format!(
+            "/modules/article/search.php?searchtype={search_type}&searchkey={search_key_encoded}&page={page}&charset=gbk"
+        )
+    }
+
 
     pub(crate) fn parse_search(text: &str) -> Result<PageStats<NovelCover>> {
         Self::parse_tag_page(text)

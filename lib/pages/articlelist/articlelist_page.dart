@@ -4,6 +4,7 @@ import '../../cubits/articlelist_cubit.dart';
 import '../../src/rust/wenku8/models.dart';
 import '../../widgets/cached_image.dart';
 import 'package:wild/widgets/novel_card.dart';
+import 'package:wild/l10n/ui_language.dart';
 
 class ArticlelistPage extends StatefulWidget {
   const ArticlelistPage({super.key});
@@ -47,8 +48,11 @@ class _ArticlelistPageState extends State<ArticlelistPage> {
                 Text(state.message),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () => context.read<ArticlelistCubit>().loadNovels(refresh: true),
-                  child: const Text('重试'),
+                  onPressed:
+                      () => context.read<ArticlelistCubit>().loadNovels(
+                        refresh: true,
+                      ),
+                  child: Text(l10n('重试')),
                 ),
               ],
             ),
@@ -57,41 +61,45 @@ class _ArticlelistPageState extends State<ArticlelistPage> {
 
         if (state is ArticlelistLoaded) {
           return RefreshIndicator(
-            onRefresh: () => context.read<ArticlelistCubit>().loadNovels(refresh: true),
-            child: state.novels.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : GridView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(8),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      childAspectRatio: 0.7,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
-                    itemCount: state.novels.length + (state.hasMore ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (index == state.novels.length) {
-                        return const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: CircularProgressIndicator(),
+            onRefresh:
+                () =>
+                    context.read<ArticlelistCubit>().loadNovels(refresh: true),
+            child:
+                state.novels.isEmpty
+                    ? const Center(child: CircularProgressIndicator())
+                    : GridView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(8),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            childAspectRatio: 0.7,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
                           ),
-                        );
-                      }
-                      final novel = state.novels[index];
-                      return NovelCard.fromNovel(
-                        novel: novel,
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            '/novel/info',
-                            arguments: novel.id,
+                      itemCount: state.novels.length + (state.hasMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == state.novels.length) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(),
+                            ),
                           );
-                        },
-                      );
-                    },
-                  ),
+                        }
+                        final novel = state.novels[index];
+                        return NovelCard.fromNovel(
+                          novel: novel,
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              '/novel/info',
+                              arguments: novel.id,
+                            );
+                          },
+                        );
+                      },
+                    ),
           );
         }
 
@@ -99,4 +107,4 @@ class _ArticlelistPageState extends State<ArticlelistPage> {
       },
     );
   }
-} 
+}

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:wild/src/rust/api/wenku8.dart' as w8;
 import 'package:wild/src/rust/wenku8/models.dart';
 import 'package:wild/widgets/cached_image.dart';
+import 'package:wild/l10n/ui_language.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class NovelDownloadingPage extends StatefulWidget {
   final String novelId;
@@ -31,7 +33,8 @@ class _NovelDownloadingPageState extends State<NovelDownloadingPage> {
     // 如果有已下载的章节，初始化选中状态
     if (widget.existsDownload != null) {
       for (final chapter in widget.existsDownload!.novelDownloadChapter) {
-        if (chapter.downloadStatus == 0) { // DOWNLOAD_STATUS_NOT_DOWNLOAD
+        if (chapter.downloadStatus == 0) {
+          // DOWNLOAD_STATUS_NOT_DOWNLOAD
           _selectedChapters.add(chapter.id);
         }
       }
@@ -58,8 +61,10 @@ class _NovelDownloadingPageState extends State<NovelDownloadingPage> {
           for (final chapter in volume.chapters) {
             // 只选择未下载的章节
             if (widget.existsDownload == null ||
-                !widget.existsDownload!.novelDownloadChapter
-                    .any((c) => c.id == chapter.cid && c.downloadStatus != 0)) { // DOWNLOAD_STATUS_NOT_DOWNLOAD
+                !widget.existsDownload!.novelDownloadChapter.any(
+                  (c) => c.id == chapter.cid && c.downloadStatus != 0,
+                )) {
+              // DOWNLOAD_STATUS_NOT_DOWNLOAD
               _selectedChapters.add(chapter.cid);
             }
           }
@@ -71,9 +76,9 @@ class _NovelDownloadingPageState extends State<NovelDownloadingPage> {
 
   Future<void> _startDownload() async {
     if (_selectedChapters.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请选择要下载的章节')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n('请选择要下载的章节'))));
       return;
     }
 
@@ -83,15 +88,15 @@ class _NovelDownloadingPageState extends State<NovelDownloadingPage> {
         cidList: _selectedChapters.toList(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('开始下载')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n('开始下载'))));
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('下载失败: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${l10n('下载失败: ')}$e')));
     }
   }
 
@@ -99,10 +104,12 @@ class _NovelDownloadingPageState extends State<NovelDownloadingPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('选择下载章节'),
+        title: Text(l10n('选择下载章节')),
         actions: [
           IconButton(
-            icon: Icon(_isSelectingAll ? Icons.check_box : Icons.check_box_outline_blank),
+            icon: Icon(
+              _isSelectingAll ? Icons.check_box : Icons.check_box_outline_blank,
+            ),
             onPressed: _toggleSelectAll,
           ),
           IconButton(
@@ -139,19 +146,21 @@ class _NovelDownloadingPageState extends State<NovelDownloadingPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '作者：${widget.novelInfo.author}',
+                          '${l10n('作者：')}${widget.novelInfo.author}',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '状态：${widget.novelInfo.status}',
+                          '${l10n('状态：')}${widget.novelInfo.status}',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         if (widget.existsDownload != null) ...[
                           const SizedBox(height: 8),
                           Text(
-                            '已下载：${widget.existsDownload!.novelDownload.downloadChapterCount}/${widget.existsDownload!.novelDownload.chooseChapterCount}章',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            '${l10n('已下载：')}${widget.existsDownload!.novelDownload.downloadChapterCount}/${widget.existsDownload!.novelDownload.chooseChapterCount}${l10n('章')}',
+                            style: Theme.of(
+                              context,
+                            ).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
@@ -170,34 +179,54 @@ class _NovelDownloadingPageState extends State<NovelDownloadingPage> {
               itemBuilder: (context, volumeIndex) {
                 final volume = widget.volumes[volumeIndex];
                 return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  margin: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Text(
-                          volume.title,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                          cv(volume.title),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
                       const Divider(height: 1),
                       ...volume.chapters.map((chapter) {
-                        final isDownloaded = widget.existsDownload?.novelDownloadChapter
-                            .any((c) => c.id == chapter.cid && c.downloadStatus != 0) ?? false; // DOWNLOAD_STATUS_NOT_DOWNLOAD
-                        final isSelected = _selectedChapters.contains(chapter.cid);
+                        final isDownloaded =
+                            widget.existsDownload?.novelDownloadChapter.any(
+                              (c) =>
+                                  c.id == chapter.cid && c.downloadStatus != 0,
+                            ) ??
+                            false; // DOWNLOAD_STATUS_NOT_DOWNLOAD
+                        final isSelected = _selectedChapters.contains(
+                          chapter.cid,
+                        );
 
                         return ListTile(
-                          title: Text(chapter.title),
-                          trailing: isDownloaded
-                              ? const Icon(Icons.check_circle, color: Colors.green)
-                              : Checkbox(
-                                  value: isSelected,
-                                  onChanged: isDownloaded ? null : (_) => _toggleChapterSelection(chapter.cid),
-                                ),
-                          onTap: isDownloaded ? null : () => _toggleChapterSelection(chapter.cid),
+                          title: Text(cv(chapter.title)),
+                          trailing:
+                              isDownloaded
+                                  ? const Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                  )
+                                  : Checkbox(
+                                    value: isSelected,
+                                    onChanged:
+                                        isDownloaded
+                                            ? null
+                                            : (_) => _toggleChapterSelection(
+                                              chapter.cid,
+                                            ),
+                                  ),
+                          onTap:
+                              isDownloaded
+                                  ? null
+                                  : () => _toggleChapterSelection(chapter.cid),
                         );
                       }).toList(),
                     ],
@@ -210,4 +239,4 @@ class _NovelDownloadingPageState extends State<NovelDownloadingPage> {
       ),
     );
   }
-} 
+}

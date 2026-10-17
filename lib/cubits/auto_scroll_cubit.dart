@@ -1,10 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 
-enum AutoScrollState {
-  stopped,
-  scrolling,
-}
+enum AutoScrollState { stopped, scrolling }
 
 class AutoScrollCubit extends Cubit<AutoScrollState> {
   AutoScrollCubit() : super(AutoScrollState.stopped);
@@ -16,4 +13,4 @@ class AutoScrollCubit extends Cubit<AutoScrollState> {
   void stopScrolling() {
     emit(AutoScrollState.stopped);
   }
-} 
+}

@@ -5,6 +5,8 @@ import 'package:wild/src/rust/wenku8/models.dart' as w8;
 import 'package:wild/widgets/cached_image.dart';
 
 import 'recommend_cubit.dart';
+import 'package:wild/l10n/ui_language.dart';
+import 'package:wild/l10n/content_language.dart';
 
 class RecommendPage extends StatelessWidget {
   const RecommendPage({super.key});
@@ -20,7 +22,7 @@ class RecommendPage extends StatelessWidget {
               return const Center(child: CircularProgressIndicator());
             }
             if (state is RecommendError) {
-              return Center(child: Text('加载失败: ${state.message}'));
+              return Center(child: Text('${l10n('加载失败: ')}${state.message}'));
             }
             if (state is RecommendLoaded) {
               return RefreshIndicator(
@@ -55,10 +57,10 @@ class _HomeBlockWidget extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
           child: Text(
-            block.title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            cv(block.title),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
         ),
         Padding(
@@ -98,16 +100,11 @@ class _NovelCoverCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: CachedImage(
-              url: novel.img,
-              fit: BoxFit.cover,
-            ),
-          ),
+          Expanded(child: CachedImage(url: novel.img, fit: BoxFit.cover)),
           Padding(
             padding: const EdgeInsets.all(4.0),
             child: Text(
-              novel.title,
+              cv(novel.title),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
@@ -123,4 +120,4 @@ class _NovelCoverCard extends StatelessWidget {
       child: card,
     );
   }
-} 
+}
