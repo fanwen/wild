@@ -133,6 +133,38 @@ fn parse_search() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 回归：搜索路径里绝不能带 `charset` —— CF 的 WAF 对
+/// `/modules/article/search.php?…charset=…` 一律硬挡（403 "You are unable to access wenku8"），
+/// 值写 gbk 或 utf-8 都一样，去掉参数才拿得到搜索结果页。
+#[test]
+fn test_search_path_must_not_carry_charset() {
+    let path = Wenku8Client::search_path_encoded("articlename", "%C4%A7%B7%A8", 2);
+    assert!(
+        !path.contains("charset"),
+        "搜索路径带了 charset 参数，会被 CF WAF 硬挡: {path}"
+    );
+    assert_eq!(
+        path,
+        "/modules/article/search.php?searchtype=articlename&searchkey=%C4%A7%B7%A8&page=2"
+    );
+}
+
+/// 用真实搜索结果页取样（不带 charset 的 URL，关键词「魔女」，第 1 页）断言解析结果。
+#[test]
+fn test_parse_search_page_fixture() -> anyhow::Result<()> {
+    let text = include_str!("../test_data/search_page.html");
+    let page = Wenku8Client::parse_search(text)?;
+    assert_eq!(page.current_page, 1);
+    assert_eq!(page.max_page, 4);
+    assert_eq!(page.records.len(), 20, "搜索结果条数不对");
+    assert_eq!(page.records[0].aid, "4343");
+    assert_eq!(page.records[0].title, "你好，身为魔女的我，被心上人委托制作迷情药。");
+    assert_eq!(page.records[1].aid, "3221");
+    assert_eq!(page.records[0].img, "http://img.wenku8.com/image/4/4343/4343s.jpg");
+    assert_eq!(page.records[0].detail_url, "/book/4343.htm");
+    Ok(())
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_novel_info() -> anyhow::Result<()> {
     init_context().await?;

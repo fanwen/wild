@@ -15,7 +15,9 @@ import 'package:wild/src/rust/wenku8/models.dart';
 /// 这里用同一条路子：
 ///   1. 先加载首页 → 过 CF 挑战、注入 Rust 侧的 session cookie（等于已登录的浏览器）
 ///   2. 在页面里建一个 form 提交搜索 —— 让浏览器按页面 charset(gbk) 编码关键词，
-///      免得 Dart 侧自己去做 GBK 编码
+///      免得 Dart 侧自己去做 GBK 编码。
+///      **不能**带 charset 参数：CF 的 WAF 对 `/modules/article/search.php?…charset=…`
+///      一律硬挡（403 "You are unable to access wenku8"），值写 gbk/utf-8 都一样。
 ///   3. 结果页上用 JS 把书列表抠成 JSON（选择器与 Rust 的 parse_books 一致：
 ///      `table.grid tr td > div` → `a[title][href] > img[src]`），翻页信息取 `em#pagestats`
 ///
@@ -150,6 +152,7 @@ class _CfSearchLoaderState extends State<CfSearchLoader> {
   }
 
   /// 在页面里建 form 提交搜索（浏览器会按 GBK 编码 searchkey）。
+  /// **不要**加 charset 参数 —— 会被 CF WAF 直接挡（见文件头说明）。
   Future<void> _submitSearch() async {
     final type = jsonEncode(widget.searchType);
     final key = jsonEncode(widget.searchKey);
@@ -160,8 +163,7 @@ class _CfSearchLoaderState extends State<CfSearchLoader> {
   f.action = '/modules/article/search.php';
   f.innerHTML = '<input name="searchtype" value=' + $type + '>' +
                 '<input name="searchkey" value=' + $key + '>' +
-                '<input name="page" value="${widget.page}">' +
-                '<input name="charset" value="gbk">';
+                '<input name="page" value="${widget.page}">';
   document.body.appendChild(f);
   f.submit();
   return 'submitted';

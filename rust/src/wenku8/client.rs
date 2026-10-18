@@ -1521,9 +1521,17 @@ impl Wenku8Client {
         Self::search_path_encoded(search_type, &gbk_url_encode(search_key), page)
     }
 
-    fn search_path_encoded(search_type: &str, search_key_encoded: &str, page: i32) -> String {
+    /// 注意：**不能**带 `charset=gbk` 参数 —— Cloudflare 的 WAF 对
+    /// `/modules/article/search.php?…charset=…` 一律硬挡（403 "You are unable to access wenku8"），
+    /// 值写 gbk 或 utf-8 都一样；去掉参数就正常返回搜索结果页。
+    /// 服务端返回的页面本身仍是 GBK，解码照旧用 decode_gbk。
+    pub(crate) fn search_path_encoded(
+        search_type: &str,
+        search_key_encoded: &str,
+        page: i32,
+    ) -> String {
         format!(
-            "/modules/article/search.php?searchtype={search_type}&searchkey={search_key_encoded}&page={page}&charset=gbk"
+            "/modules/article/search.php?searchtype={search_type}&searchkey={search_key_encoded}&page={page}"
         )
     }
 
