@@ -1611,7 +1611,7 @@ class _ChapterListState extends State<_ChapterList> {
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: Text(
-                        volume.title,
+                        cv(volume.title),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ),
@@ -1621,7 +1621,7 @@ class _ChapterListState extends State<_ChapterList> {
                           chapter.cid == widget.currentCid;
                       return ListTile(
                         title: Text(
-                          chapter.title,
+                          cv(chapter.title),
                           style: TextStyle(
                             color:
                                 isSelected
