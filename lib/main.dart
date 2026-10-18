@@ -31,6 +31,8 @@ import 'package:wild/pages/novel/top_bar_height_cubit.dart';
 import 'package:wild/pages/novel/bottom_bar_height_cubit.dart';
 import 'package:wild/pages/novel/left_padding_cubit.dart';
 import 'package:wild/pages/novel/right_padding_cubit.dart';
+import 'package:wild/pages/novel/paragraph_indent_cubit.dart';
+import 'package:wild/pages/novel/punctuation_rule_cubit.dart';
 import 'package:wild/pages/novel/reviews_page.dart';
 import 'package:wild/cubits/api_host_cubit.dart';
 import 'package:wild/cubits/reader_background_cubit.dart';
@@ -82,6 +84,8 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (context) => BottomBarHeightCubit()),
         BlocProvider(create: (context) => LeftPaddingCubit()),
         BlocProvider(create: (context) => RightPaddingCubit()),
+        BlocProvider(create: (context) => ParagraphIndentCubit()),
+        BlocProvider(create: (context) => PunctuationRuleCubit()),
         BlocProvider(create: (context) => UpdateCubit()),
         BlocProvider(create: (context) => ReaderTypeCubit()..loadType()),
         BlocProvider(create: (context) => ApiHostCubit()),

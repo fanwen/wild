@@ -13,6 +13,9 @@ import 'package:wild/pages/novel/font_family_cubit.dart';
 import 'package:wild/widgets/reader_font_row.dart';
 import 'package:wild/pages/novel/line_height_cubit.dart';
 import 'package:wild/pages/novel/paragraph_spacing_cubit.dart';
+import 'package:wild/pages/novel/paragraph_indent_cubit.dart';
+import 'package:wild/pages/novel/punctuation_rule_cubit.dart';
+import 'package:wild/pages/novel/reader_typography.dart';
 import 'package:wild/pages/novel/theme_cubit.dart';
 import 'package:wild/pages/novel/reader_type_cubit.dart';
 import 'package:wild/cubits/reader_background_cubit.dart';
@@ -150,6 +153,8 @@ class _HtmlReaderViewWrapperState extends State<_HtmlReaderViewWrapper> {
     final bottomBarHeightCubit = context.read<BottomBarHeightCubit>();
     final leftPaddingCubit = context.read<LeftPaddingCubit>();
     final rightPaddingCubit = context.read<RightPaddingCubit>();
+    final paragraphIndentCubit = context.read<ParagraphIndentCubit>();
+    final punctuationRuleCubit = context.read<PunctuationRuleCubit>();
     final readerTypeCubit = context.read<ReaderTypeCubit>();
     final readerBackgroundCubit = context.read<ReaderBackgroundCubit>();
     final autoScrollConfigCubit = context.read<AutoScrollConfigCubit>();
@@ -169,6 +174,8 @@ class _HtmlReaderViewWrapperState extends State<_HtmlReaderViewWrapper> {
             BlocProvider.value(value: bottomBarHeightCubit),
             BlocProvider.value(value: leftPaddingCubit),
             BlocProvider.value(value: rightPaddingCubit),
+            BlocProvider.value(value: paragraphIndentCubit),
+            BlocProvider.value(value: punctuationRuleCubit),
             BlocProvider.value(value: readerTypeCubit),
             BlocProvider.value(value: readerBackgroundCubit),
             BlocProvider.value(value: autoScrollConfigCubit),
@@ -471,19 +478,13 @@ class _HtmlReaderViewWrapperState extends State<_HtmlReaderViewWrapper> {
                                 child: ValueListenableBuilder<double>(
                                   valueListenable: _scrollProgress,
                                   builder: (context, progress, _) {
-                                    final cornerMedia = MediaQuery.of(context);
-                                    final cornerTop =
-                                        cornerMedia.viewPadding.top +
-                                        context
-                                            .select<TopBarHeightCubit, double>(
-                                              (cubit) => cubit.state,
-                                            );
-                                    final cornerBottom =
-                                        cornerMedia.viewPadding.bottom +
-                                        context.select<
-                                          BottomBarHeightCubit,
-                                          double
-                                        >((cubit) => cubit.state);
+                                    // 读 view 的几何：Scaffold 有 AppBar 时会把 MediaQuery 的
+                                    // padding/viewPadding.top 清成 0，直接读 MediaQuery.of 会让
+                                    // 角标带落进 AppBar 里被盖住（真机表现为「四角不显示」）。
+                                    final cornerGeometry =
+                                        MediaQueryData.fromView(
+                                          WidgetsBinding.instance.window,
+                                        );
                                     final cornerLeft = context
                                         .select<LeftPaddingCubit, double>(
                                           (cubit) => cubit.state,
@@ -498,12 +499,18 @@ class _HtmlReaderViewWrapperState extends State<_HtmlReaderViewWrapper> {
                                               ? state.title
                                               : '',
                                       color: textColor,
-                                      padding: EdgeInsets.only(
-                                        top: cornerTop,
-                                        bottom: cornerBottom,
-                                        left: cornerLeft,
-                                        right: cornerRight,
-                                      ),
+                                      // 滚动式阅读器非全屏时顶部有 AppBar、系统栏也可能临时显示：
+                                      // 角标带要让开它们，否则会被 AppBar/导航栏盖住（看着像不显示）。
+                                      safeTop:
+                                          cornerGeometry.viewPadding.top +
+                                          (isFullscreen ? 0 : kToolbarHeight),
+                                      safeBottom:
+                                          cornerGeometry.padding.bottom >
+                                              cornerGeometry.viewPadding.bottom
+                                          ? cornerGeometry.padding.bottom
+                                          : cornerGeometry.viewPadding.bottom,
+                                      leftInset: cornerLeft,
+                                      rightInset: cornerRight,
                                       progressText:
                                           '${(progress * 100).round()}${l10n('% 已读')}',
                                     );
@@ -547,21 +554,41 @@ class _ReaderContent extends StatelessWidget {
     required double lineHeight,
     required double paragraphSpacing,
     required Color textColor,
+    required double maxWidth,
+    required int indentChars,
+    required bool allowPunctuationAtLineStart,
   }) {
     final widgets = <Widget>[];
+    final measureStyle = TextStyle(
+      fontSize: fontSize,
+      fontFamily: fontFamily.isEmpty ? null : fontFamily,
+      height: lineHeight,
+    );
 
     for (var content in parsedContent) {
       if (content is ParsedText) {
+        // 全角标点 + 段首缩进 + 行尾排满：和分页阅读器用同一份排版函数
+        final text = applyReaderTypography(
+          content.text,
+          indentChars: indentChars,
+          allowPunctuationAtLineStart: allowPunctuationAtLineStart,
+          style: measureStyle,
+          maxWidth: maxWidth,
+        );
         widgets.add(
           Padding(
             padding: EdgeInsets.only(bottom: paragraphSpacing),
-            child: Text(
-              content.text,
-              style: TextStyle(
-                fontSize: fontSize,
-                fontFamily: fontFamily.isEmpty ? null : fontFamily,
-                height: lineHeight,
-                color: textColor,
+            child: Text.rich(
+              // 排版过的段落：行结构由排版层定，行尾按版心拉伸对齐
+              readerParagraphSpan(
+                text,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontFamily: fontFamily.isEmpty ? null : fontFamily,
+                  height: lineHeight,
+                  color: textColor,
+                ),
+                maxWidth: maxWidth,
               ),
             ),
           ),
@@ -623,16 +650,7 @@ class _ReaderContent extends StatelessWidget {
                                       WidgetsBinding.instance.window,
                                     ).viewPadding.bottom;
 
-                                final col = [
-                                  ..._buildContentWidgets(
-                                    context,
-                                    fontSize: fontSize,
-                                    fontFamily: fontFamily,
-                                    lineHeight: lineHeight,
-                                    paragraphSpacing: paragraphSpacing,
-                                    textColor: textColor,
-                                  ),
-                                  ...[
+                                final tail = [
                                     const SizedBox(height: 32),
                                     Row(
                                       mainAxisAlignment:
@@ -655,7 +673,6 @@ class _ReaderContent extends StatelessWidget {
                                       ],
                                     ),
                                     const SizedBox(height: 32),
-                                  ],
                                 ];
 
                                 return BlocBuilder<LeftPaddingCubit, double>(
@@ -665,15 +682,75 @@ class _ReaderContent extends StatelessWidget {
                                       double
                                     >(
                                       builder: (context, rightPadding) {
-                                        return ListView(
-                                          controller: scrollController,
-                                          padding: EdgeInsets.only(
-                                            left: leftPadding,
-                                            right: rightPadding,
-                                            top: topBarHeight + topPad,
-                                            bottom: bottomBarHeight + bottomPad,
-                                          ),
-                                          children: col,
+                                        return BlocBuilder<
+                                          ParagraphIndentCubit,
+                                          int
+                                        >(
+                                          builder: (context, indentChars) {
+                                            return BlocBuilder<
+                                              PunctuationRuleCubit,
+                                              bool
+                                            >(
+                                              builder: (
+                                                context,
+                                                allowPunctuationAtLineStart,
+                                              ) {
+                                                final contentWidth =
+                                                    MediaQueryData.fromView(
+                                                          WidgetsBinding
+                                                              .instance
+                                                              .window,
+                                                        ).size.width -
+                                                        leftPadding -
+                                                        rightPadding;
+                                                final col = [
+                                                  ..._buildContentWidgets(
+                                                    context,
+                                                    fontSize: fontSize,
+                                                    fontFamily: fontFamily,
+                                                    lineHeight: lineHeight,
+                                                    paragraphSpacing:
+                                                        paragraphSpacing,
+                                                    textColor: textColor,
+                                                    maxWidth: contentWidth,
+                                                    indentChars: indentChars,
+                                                    allowPunctuationAtLineStart:
+                                                        allowPunctuationAtLineStart,
+                                                  ),
+                                                  ...tail,
+                                                ];
+                                                // 正文只在上、下角标栏之间这块区域里滚动：
+                                                // 把滚动视口按内容区裁掉（安全区 + AppBar + 角标栏 + 边距），
+                                                // 文字不会滚到角标栏/状态栏底下 —— 分页阅读器本来就是这样。
+                                                final contentTop =
+                                                    topPad +
+                                                    (isFullscreen
+                                                        ? 0
+                                                        : kToolbarHeight) +
+                                                    kReaderCornerBarHeight +
+                                                    topBarHeight;
+                                                final contentBottom =
+                                                    bottomPad +
+                                                    kReaderCornerBarHeight +
+                                                    bottomBarHeight;
+                                                return Padding(
+                                                  padding: EdgeInsets.only(
+                                                    top: contentTop,
+                                                    bottom: contentBottom,
+                                                  ),
+                                                  child: ListView(
+                                                    controller: scrollController,
+                                                    // 上下留白由外层 Padding 负责，这里只管左右
+                                                    padding: EdgeInsets.only(
+                                                      left: leftPadding,
+                                                      right: rightPadding,
+                                                    ),
+                                                    children: col,
+                                                  ),
+                                                );
+                                              },
+                                            );
+                                          },
                                         );
                                       },
                                     );
@@ -711,6 +788,8 @@ class _ReaderSettings extends StatelessWidget {
     final bottomBarHeightCubit = context.read<BottomBarHeightCubit>();
     final leftPaddingCubit = context.read<LeftPaddingCubit>();
     final rightPaddingCubit = context.read<RightPaddingCubit>();
+    final paragraphIndentCubit = context.read<ParagraphIndentCubit>();
+    final punctuationRuleCubit = context.read<PunctuationRuleCubit>();
     final readerTypeCubit = context.read<ReaderTypeCubit>();
     final readerBackgroundCubit = context.read<ReaderBackgroundCubit>();
     final autoScrollConfigCubit = context.read<AutoScrollConfigCubit>();
@@ -843,6 +922,49 @@ class _ReaderSettings extends StatelessWidget {
               const Divider(),
               // 内容语言（正文字形）：跟随界面语言 / 繁體中文 / 简体中文（原文）
               const ContentLanguageRow(),
+              // 段首缩进（空几个字）
+              BlocBuilder<ParagraphIndentCubit, int>(
+                builder: (context, indent) {
+                  return Row(
+                    children: [
+                      Text(l10n('段首缩进')),
+                      Expanded(
+                        child: Slider(
+                          value: indent.toDouble(),
+                          min: 0,
+                          max: ParagraphIndentCubit.maxIndent.toDouble(),
+                          divisions: ParagraphIndentCubit.maxIndent,
+                          label: indent.toString(),
+                          onChanged: (value) async {
+                            await paragraphIndentCubit.updateParagraphIndent(
+                              value.round(),
+                            );
+                          },
+                        ),
+                      ),
+                      Text('$indent ${l10n('字')}'),
+                    ],
+                  );
+                },
+              ),
+              // 避头点：标点不排到行首
+              BlocBuilder<PunctuationRuleCubit, bool>(
+                builder: (context, enabled) {
+                  return Row(
+                    children: [
+                      Expanded(child: Text(l10n('标点可置行首'))),
+                      Switch(
+                        value: enabled,
+                        onChanged: (value) async {
+                          await punctuationRuleCubit.updatePunctuationRule(
+                            value,
+                          );
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
               // 段落间距设置
               BlocBuilder<ParagraphSpacingCubit, double>(
                 builder: (context, spacing) {

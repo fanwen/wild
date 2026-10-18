@@ -10,6 +10,8 @@ import 'package:wild/cubits/ui_locale_cubit.dart';
 import 'package:wild/cubits/content_language_cubit.dart';
 import 'package:wild/pages/novel/paragraph_spacing_cubit.dart';
 import 'package:wild/pages/novel/line_height_cubit.dart';
+import 'package:wild/pages/novel/paragraph_indent_cubit.dart';
+import 'package:wild/pages/novel/punctuation_rule_cubit.dart';
 import 'package:wild/pages/novel/theme_cubit.dart';
 import 'package:wild/pages/novel/reader_type_cubit.dart';
 import 'package:wild/src/rust/api/system.dart';
@@ -50,6 +52,8 @@ class _InitPageState extends State<InitPage> {
     final uiLocaleCubit = context.read<UiLocaleCubit>();
     final contentLanguageCubit = context.read<ContentLanguageCubit>();
     final paragraphSpacingCubit = context.read<ParagraphSpacingCubit>();
+    final paragraphIndentCubit = context.read<ParagraphIndentCubit>();
+    final punctuationRuleCubit = context.read<PunctuationRuleCubit>();
     final lineHeightCubit = context.read<LineHeightCubit>();
     final themeCubit = context.read<ThemeCubit>();
     final authCubit = context.read<AuthCubit>();
@@ -67,6 +71,8 @@ class _InitPageState extends State<InitPage> {
       uiLocaleCubit.loadLanguage(),
       contentLanguageCubit.load(),
       paragraphSpacingCubit.loadSpacing(),
+      paragraphIndentCubit.loadParagraphIndent(),
+      punctuationRuleCubit.loadPunctuationRule(),
       lineHeightCubit.loadLineHeight(),
       themeCubit.loadTheme(),
       authCubit.init(),

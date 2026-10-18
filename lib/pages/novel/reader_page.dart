@@ -19,6 +19,9 @@ import 'top_bar_height_cubit.dart';
 import 'bottom_bar_height_cubit.dart';
 import 'left_padding_cubit.dart';
 import 'right_padding_cubit.dart';
+import 'paragraph_indent_cubit.dart';
+import 'punctuation_rule_cubit.dart';
+import 'reader_typography.dart';
 import 'reader_type_cubit.dart';
 import 'package:wild/cubits/reader_background_cubit.dart';
 import 'package:wild/cubits/reader_battery.dart';
@@ -58,6 +61,8 @@ class ReaderPage extends StatelessWidget {
     final bottomBarHeightCubit = context.read<BottomBarHeightCubit>();
     final leftPaddingCubit = context.read<LeftPaddingCubit>();
     final rightPaddingCubit = context.read<RightPaddingCubit>();
+    final paragraphIndentCubit = context.read<ParagraphIndentCubit>();
+    final punctuationRuleCubit = context.read<PunctuationRuleCubit>();
     final readerTypeCubit = context.read<ReaderTypeCubit>();
 
     return MultiBlocProvider(
@@ -70,6 +75,8 @@ class ReaderPage extends StatelessWidget {
         BlocProvider.value(value: bottomBarHeightCubit),
         BlocProvider.value(value: leftPaddingCubit),
         BlocProvider.value(value: rightPaddingCubit),
+        BlocProvider.value(value: paragraphIndentCubit),
+        BlocProvider.value(value: punctuationRuleCubit),
         BlocProvider.value(value: readerTypeCubit),
         BlocProvider(
           create:
@@ -86,6 +93,8 @@ class ReaderPage extends StatelessWidget {
                 bottomBarHeightCubit: bottomBarHeightCubit,
                 leftPaddingCubit: leftPaddingCubit,
                 rightPaddingCubit: rightPaddingCubit,
+                paragraphIndentCubit: paragraphIndentCubit,
+                punctuationRuleCubit: punctuationRuleCubit,
               )..loadChapter(initialPage: initialPage),
         ),
       ],
@@ -335,13 +344,8 @@ class _ReaderViewState extends State<_ReaderView> {
     final mediaQuery = MediaQuery.of(context);
     final topPadding = mediaQuery.viewPadding.top;
     final bottomPadding = mediaQuery.viewPadding.bottom;
-    // 四角信息要和正文块对齐，所以订阅这些边距（改设置时角标跟着动）
-    final topBarHeight = context.select<TopBarHeightCubit, double>(
-      (cubit) => cubit.state,
-    );
-    final bottomBarHeight = context.select<BottomBarHeightCubit, double>(
-      (cubit) => cubit.state,
-    );
+    // 四角信息要和正文块左右对齐，所以订阅左右边距（改设置时角标跟着动）；
+    // 上下边距只影响分页（设置面板里改完会 reloadCurrentPage），这里不用订阅。
     final leftPadding = context.select<LeftPaddingCubit, double>(
       (cubit) => cubit.state,
     );
@@ -418,6 +422,7 @@ class _ReaderViewState extends State<_ReaderView> {
                           return _TextPage(
                             content: page.content,
                             textColor: textColor,
+                            continues: page.continues,
                           );
                         },
                       ),
@@ -428,12 +433,10 @@ class _ReaderViewState extends State<_ReaderView> {
                     child: ReaderCorners(
                       chapterTitle: widget.title,
                       color: textColor,
-                      padding: EdgeInsets.only(
-                        top: topPadding + topBarHeight,
-                        bottom: bottomPadding + bottomBarHeight,
-                        left: leftPadding,
-                        right: rightPadding,
-                      ),
+                      safeTop: topPadding,
+                      safeBottom: bottomPadding,
+                      leftInset: leftPadding,
+                      rightInset: rightPadding,
                       pageNumber: widget.state.currentPageIndex + 1,
                       pageCount: widget.state.pages.length,
                     ),
@@ -533,7 +536,14 @@ class _TextPage extends StatelessWidget {
   final String content;
   final Color textColor;
 
-  const _TextPage({required this.content, required this.textColor});
+  /// 本页最后一个段落被分页截断（末行不是段落末行，也要两端对齐、不带段间距）
+  final bool continues;
+
+  const _TextPage({
+    required this.content,
+    required this.textColor,
+    this.continues = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -570,17 +580,27 @@ class _TextPage extends StatelessWidget {
             return BlocBuilder<LineHeightCubit, double>(
               builder: (context, lineHeight) {
                 var texts = content.split("\n");
+                // 本页最后一个非空段落的下标（内容以 \n 结尾，末尾会有个空串）
+                var lastTextIndex = texts.length - 1;
+                while (lastTextIndex >= 0 && texts[lastTextIndex].isEmpty) {
+                  lastTextIndex--;
+                }
                 return Column(
                   children: [
+                    // 布局自上而下：安全区 → 上角标栏 → 上边距 → 正文 → 下边距 →
+                    // 下角标栏 → 安全区（上/下边距是用户设的值，不含角标栏）
                     Container(height: topPadding),
+                    Container(height: kReaderCornerBarHeight),
                     Container(height: topBarHeight),
                     for (var i = 0; i < texts.length; i++) ...[
                       SizedBox(
                         width: canvasWidth,
                         child: Text.rich(
                           strutStyle: StrutStyle(height: lineHeight),
-                          TextSpan(
-                            text: texts[i],
+                          // 行结构由排版层定（行尾排满 + 两端对齐）；
+                          // 被分页截断的段落末行同样要对齐
+                          readerParagraphSpan(
+                            texts[i],
                             style: TextStyle(
                               fontSize: fontSize,
                               fontFamily:
@@ -589,12 +609,19 @@ class _TextPage extends StatelessWidget {
                               letterSpacing: 0.5,
                               color: textColor,
                             ),
+                            maxWidth: canvasWidth,
+                            continuesAfter: continues && i == lastTextIndex,
                           ),
                         ),
                       ),
-                      if (i < texts.length - 1) Container(height: spacing),
+                      // 截断的段落后面不跟段间距（它不是段落结束）
+                      if (i < texts.length - 1 &&
+                          !(continues && i == lastTextIndex))
+                        Container(height: spacing),
                     ],
                     Expanded(child: Container()),
+                    Container(height: bottomBarHeight),
+                    Container(height: kReaderCornerBarHeight),
                     Container(height: bottomPadding),
                   ],
                 );
@@ -629,12 +656,15 @@ class _ImagePage extends StatelessWidget {
         screenHeight -
         topPadding -
         bottomPadding -
+        kReaderCornerBarHeight * 2 -
         topBarHeight -
         bottomBarHeight;
 
     return Column(
       children: [
-        Container(height: topPadding + topBarHeight),
+        Container(
+          height: topPadding + kReaderCornerBarHeight + topBarHeight,
+        ),
         SizedBox(
           width: screenWidth - leftAndRightPadding,
           height: availableHeight,
@@ -645,7 +675,9 @@ class _ImagePage extends StatelessWidget {
           ),
         ),
         Expanded(child: Container()),
-        Container(height: bottomPadding),
+        Container(
+          height: bottomBarHeight + kReaderCornerBarHeight + bottomPadding,
+        ),
       ],
     );
   }
@@ -883,6 +915,8 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
   late final bottomBarHeightCubit = context.read<BottomBarHeightCubit>();
   late final leftPaddingCubit = context.read<LeftPaddingCubit>();
   late final rightPaddingCubit = context.read<RightPaddingCubit>();
+  late final paragraphIndentCubit = context.read<ParagraphIndentCubit>();
+  late final punctuationRuleCubit = context.read<PunctuationRuleCubit>();
   late final readerTypeCubit = context.read<ReaderTypeCubit>();
   late final readerBackgroundCubit = context.read<ReaderBackgroundCubit>();
 
@@ -1039,6 +1073,53 @@ class _ReaderSettingsState extends State<_ReaderSettings> {
                         ),
                       ),
                       Text('${spacing.round()}', style: TextStyle()),
+                    ],
+                  );
+                },
+              ),
+              // 段首缩进（空几个字）
+              BlocBuilder<ParagraphIndentCubit, int>(
+                builder: (context, indent) {
+                  return Row(
+                    children: [
+                      Text(l10n('段首缩进'), style: const TextStyle()),
+                      Expanded(
+                        child: Slider(
+                          value: indent.toDouble(),
+                          min: 0,
+                          max: ParagraphIndentCubit.maxIndent.toDouble(),
+                          divisions: ParagraphIndentCubit.maxIndent,
+                          label: indent.toString(),
+                          onChanged: (value) async {
+                            await paragraphIndentCubit.updateParagraphIndent(
+                              value.round(),
+                            );
+                            await widget.readerCubit.reloadCurrentPage();
+                          },
+                        ),
+                      ),
+                      Text('$indent ${l10n('字')}', style: const TextStyle()),
+                    ],
+                  );
+                },
+              ),
+              // 避头点：标点不排到行首
+              BlocBuilder<PunctuationRuleCubit, bool>(
+                builder: (context, enabled) {
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: Text(l10n('标点可置行首'), style: const TextStyle()),
+                      ),
+                      Switch(
+                        value: enabled,
+                        onChanged: (value) async {
+                          await punctuationRuleCubit.updatePunctuationRule(
+                            value,
+                          );
+                          await widget.readerCubit.reloadCurrentPage();
+                        },
+                      ),
                     ],
                   );
                 },

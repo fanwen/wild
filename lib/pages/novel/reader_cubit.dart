@@ -11,8 +11,12 @@ import '../../src/rust/wenku8/models.dart';
 import 'package:wild/pages/novel/top_bar_height_cubit.dart';
 import 'package:wild/pages/novel/bottom_bar_height_cubit.dart';
 import 'package:wild/pages/novel/left_padding_cubit.dart';
+import 'package:wild/pages/novel/paragraph_indent_cubit.dart';
+import 'package:wild/pages/novel/punctuation_rule_cubit.dart';
 import 'package:wild/pages/novel/right_padding_cubit.dart';
+import 'package:wild/widgets/reader_corners.dart';
 import 'package:wild/pages/novel/reader_markers.dart';
+import 'package:wild/pages/novel/reader_typography.dart';
 import 'package:wild/l10n/content_language.dart';
 
 class ReaderCubit extends Cubit<ReaderState> {
@@ -31,6 +35,8 @@ class ReaderCubit extends Cubit<ReaderState> {
   final BottomBarHeightCubit bottomBarHeightCubit;
   final LeftPaddingCubit leftPaddingCubit;
   final RightPaddingCubit rightPaddingCubit;
+  final ParagraphIndentCubit paragraphIndentCubit;
+  final PunctuationRuleCubit punctuationRuleCubit;
 
   ReaderCubit({
     required this.novelInfo,
@@ -45,6 +51,8 @@ class ReaderCubit extends Cubit<ReaderState> {
     required this.bottomBarHeightCubit,
     required this.leftPaddingCubit,
     required this.rightPaddingCubit,
+    required this.paragraphIndentCubit,
+    required this.punctuationRuleCubit,
   }) : super(ReaderInitial());
 
   String _findChapterTitle(String aid, String cid) {
@@ -102,6 +110,8 @@ class ReaderCubit extends Cubit<ReaderState> {
         fontFamily,
         paragraphSpacing,
         lineHeight,
+        paragraphIndentCubit.state,
+        punctuationRuleCubit.state,
       );
 
       // 验证并设置初始页码
@@ -176,6 +186,8 @@ class ReaderCubit extends Cubit<ReaderState> {
         fontFamily,
         paragraphSpacing,
         lineHeight,
+        paragraphIndentCubit.state,
+        punctuationRuleCubit.state,
       );
 
       if (currentPageIndex >= pages.length) {
@@ -339,6 +351,8 @@ class ReaderCubit extends Cubit<ReaderState> {
     String fontFamily,
     double paragraphSpacing,
     double lineHeight,
+    int indentChars,
+    bool allowPunctuationAtLineStart,
   ) {
     final pages = <ReaderPage>[];
     final paragraphs = content.split('\n');
@@ -358,43 +372,136 @@ class ReaderCubit extends Cubit<ReaderState> {
     final rightPadding = rightPaddingCubit.state;
     final leftAndRightPadding = leftPadding + rightPadding;
     final canvasWidth = screenWidth - leftAndRightPadding;
+    // 上/下边距（用户设的）不含两条角标栏，角标栏是固定高度，两边都要减
     final canvasHeight =
         screenHeight -
         topPadding -
         bottomPadding -
+        kReaderCornerBarHeight * 2 -
         topBarHeight -
         bottomBarHeight;
 
     var currentPage = StringBuffer();
     var pageFreeHeight = canvasHeight;
 
+    // 排版（字号/字体/行高）与测量共用同一份 style：分页与渲染不一致会溢出/断页错位
+    final textStyle = TextStyle(
+      fontSize: fontSize,
+      fontFamily: fontFamily.isEmpty ? null : fontFamily,
+      height: lineHeight,
+      letterSpacing: 0.5,
+    );
+
     void putParagraph(String paragraph) {
       while (paragraph.isNotEmpty) {
+        // 排版过的段落（带 U+2028 行标记）：行结构已定，只能整行搬，不能再让
+        // 引擎自己折 —— 用带行压缩的 span 量高度，和渲染侧同一份结果。
+        if (hasReaderLineBreaks(paragraph)) {
+          final lines = readerLines(paragraph);
+          final span = readerParagraphSpan(
+            paragraph,
+            style: textStyle,
+            maxWidth: canvasWidth,
+          );
+          final textPainter = TextPainter(
+            textDirection: TextDirection.ltr,
+            maxLines: null,
+            strutStyle: StrutStyle(height: lineHeight),
+            text: span,
+          )..layout(maxWidth: canvasWidth);
+          final textHeight = textPainter.height;
+          final perLine = lines.isEmpty ? textHeight : textHeight / lines.length;
+          var take = perLine <= 0
+              ? lines.length
+              : (pageFreeHeight / perLine).floor();
+
+          if (take >= lines.length) {
+            // 整段放得下
+            currentPage.write(paragraph);
+            currentPage.write("\n");
+            pageFreeHeight -= textHeight + paragraphSpacing;
+            return;
+          }
+          if (take < 1) {
+            if (currentPage.isNotEmpty) {
+              // 本页塞不下整行：收尾本页，剩下的留下一次循环（新页）
+              pages.add(
+                ReaderPage(content: currentPage.toString(), isImage: false),
+              );
+              currentPage.clear();
+              pageFreeHeight = canvasHeight;
+              continue;
+            }
+            take = 1; // 一行比整页还高：硬放一行，别死循环
+          }
+          currentPage.write(lines.take(take).join(kForcedLineBreak));
+          // 这一段被截断：本页末行不是段落末行，末行也要两端对齐
+          pages.add(
+            ReaderPage(
+              content: currentPage.toString(),
+              isImage: false,
+              continues: true,
+            ),
+          );
+          currentPage.clear();
+          pageFreeHeight = canvasHeight;
+          paragraph = lines.skip(take).join(kForcedLineBreak);
+          continue;
+        }
+
         var textPainter = TextPainter(
           textDirection: TextDirection.ltr,
           maxLines: null,
         );
         textPainter.strutStyle = StrutStyle(height: lineHeight);
-        final textStyle = TextStyle(
-          fontSize: fontSize,
-          fontFamily: fontFamily.isEmpty ? null : fontFamily,
-          height: lineHeight,
-          letterSpacing: 0.5,
+        // 和渲染侧同一个 span（行尾对齐拉伸要一致，否则折行位置对不上）
+        textPainter.text = readerParagraphSpan(
+          paragraph,
+          style: textStyle,
+          maxWidth: canvasWidth,
         );
-        textPainter.text = TextSpan(text: paragraph, style: textStyle);
         textPainter.layout(maxWidth: canvasWidth);
         var textHeight = textPainter.height;
 
         if (textHeight > pageFreeHeight) {
-          // 当前段落超出页面高度，分割段落
-          var splitIndex =
+          // 当前段落超出页面高度，分割段落 —— 但**只按整行切**：
+          // 从行中间断开会让页面最后一行缺一截（用户反馈的「最后一行少一个字宽」）。
+          final rawSplit =
               textPainter
                   .getPositionForOffset(Offset(0, pageFreeHeight))
                   .offset;
+          final lineStarts = engineLineStarts(
+            paragraph,
+            maxWidth: canvasWidth,
+            style: textStyle,
+          );
+          var splitIndex = 0;
+          for (final start in lineStarts) {
+            if (start <= rawSplit) splitIndex = start;
+          }
+          if (splitIndex <= 0) {
+            // 这一整行本页放不下：本页就此收尾，整段换页重排
+            if (currentPage.isNotEmpty) {
+              pages.add(
+                ReaderPage(content: currentPage.toString(), isImage: false),
+              );
+              currentPage.clear();
+              pageFreeHeight = canvasHeight;
+              continue;
+            }
+            // 新页也放不下（行高 > 整页）：硬放一行，别死循环
+            splitIndex = lineStarts.length > 1
+                ? lineStarts[1]
+                : paragraph.length;
+          }
           var splitParagraph = paragraph.substring(0, splitIndex);
           currentPage.write(splitParagraph);
           pages.add(
-            ReaderPage(content: currentPage.toString(), isImage: false),
+            ReaderPage(
+              content: currentPage.toString(),
+              isImage: false,
+              continues: true,
+            ),
           );
           currentPage.clear();
           paragraph = paragraph.substring(splitIndex);
@@ -427,7 +534,16 @@ class ReaderCubit extends Cubit<ReaderState> {
         if (part.isImage) {
           putImage(part.imageUrl!);
         } else {
-          putParagraph(part.text!);
+          // 段首缩进 + 避头点：分页与渲染都用这一份结果
+          putParagraph(
+            applyReaderTypography(
+              part.text!,
+              indentChars: indentChars,
+              allowPunctuationAtLineStart: allowPunctuationAtLineStart,
+              style: textStyle,
+              maxWidth: canvasWidth,
+            ),
+          );
         }
       }
     }

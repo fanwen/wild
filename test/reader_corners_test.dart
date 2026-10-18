@@ -4,18 +4,16 @@ import 'package:wild/cubits/reader_battery.dart';
 import 'package:wild/cubits/reader_clock.dart';
 import 'package:wild/widgets/reader_corners.dart';
 
-/// 逻辑屏幕 360x800（1080x2400 @3x），正文边距：状态栏 24 + 上边距 56 / 导航栏 48 + 下边距 56。
+/// 逻辑屏幕 360x800（1080x2400 @3x）。
+/// 布局：状态栏安全区 24 → 上角标栏 24 →（上边距）→ 正文 →（下边距）→
+/// 下角标栏 24 → 导航栏安全区 48。（上/下边距是用户设的，不含角标栏。）
 const double _screenHeight = 800;
-const EdgeInsets _readerPadding = EdgeInsets.only(
-  top: 24 + 56,
-  bottom: 48 + 56,
-  left: 16,
-  right: 16,
-);
+const double _safeTop = 24;
+const double _safeBottom = 48;
+const double _inset = 16;
 
-Widget _host(Widget child) => MaterialApp(
-  home: Scaffold(body: Stack(children: [child])),
-);
+Widget _host(Widget child) =>
+    MaterialApp(home: Scaffold(body: Stack(children: [child])));
 
 Future<void> _pump(WidgetTester tester, Widget child) async {
   tester.view.physicalSize = const Size(1080, 2400);
@@ -35,7 +33,10 @@ void main() {
       const ReaderCorners(
         chapterTitle: '第一章 序章',
         color: Colors.black,
-        padding: _readerPadding,
+        safeTop: _safeTop,
+        safeBottom: _safeBottom,
+        leftInset: _inset,
+        rightInset: _inset,
         pageNumber: 3,
         pageCount: 12,
       ),
@@ -47,7 +48,9 @@ void main() {
     expect(find.byType(BatteryBadge), findsOneWidget);
   });
 
-  testWidgets('角标落在正文边距里：上排底边在上边距内 5px、下排顶边在下边距内 5px', (WidgetTester tester) async {
+  testWidgets('上排在「安全区+上角标栏」里、下排在下角标栏里（都不进正文区）', (
+    WidgetTester tester,
+  ) async {
     readerClock.value = '09:05';
     readerBattery.value = const ReaderBattery(level: 85, charging: false);
 
@@ -56,32 +59,42 @@ void main() {
       const ReaderCorners(
         chapterTitle: '第一章 序章',
         color: Colors.black,
-        padding: _readerPadding,
+        safeTop: _safeTop,
+        safeBottom: _safeBottom,
+        leftInset: _inset,
+        rightInset: _inset,
         pageNumber: 3,
         pageCount: 12,
       ),
     );
 
-    // 上排：电池（最高元素）底边 = padding.top - 5 = 75，且不越过正文块外沿
+    // 上角标栏 = [24, 48]，条带内垂直居中 → 中心 36
+    const barCenter = _safeTop + kReaderCornerBarHeight / 2;
     final battery = tester.getRect(find.byType(BatteryBadge));
-    expect(battery.bottom, closeTo(_readerPadding.top - 5, 0.01));
-    expect(battery.left, closeTo(_readerPadding.left, 0.01));
-    expect(battery.bottom, lessThan(_readerPadding.top));
+    expect(battery.center.dy, closeTo(barCenter, 0.01));
+    expect(battery.left, closeTo(_inset, 0.01));
+    expect(battery.top, greaterThanOrEqualTo(_safeTop));
+    expect(battery.bottom, lessThanOrEqualTo(_safeTop + kReaderCornerBarHeight));
 
-    // 右上章节名与电池同一行底部对齐
     final title = tester.getRect(find.text('第一章 序章'));
-    expect(title.bottom, closeTo(battery.bottom, 0.01));
-    expect(title.right, closeTo(360 - _readerPadding.right, 0.01));
+    expect(title.center.dy, closeTo(barCenter, 0.01));
+    expect(title.right, closeTo(360 - _inset, 0.01));
 
-    // 下排：页码顶边 = 高度 - padding.bottom + 5，时间与它同一基线
+    // 下角标栏 = [800-48-24, 800-48] = [728, 752]，中心 740
+    const bottomBarCenter =
+        _screenHeight - _safeBottom - kReaderCornerBarHeight / 2;
     final page = tester.getRect(find.text('3/12 25%'));
-    expect(page.top, closeTo(_screenHeight - _readerPadding.bottom + 5, 0.01));
-    expect(page.top, greaterThan(_screenHeight - _readerPadding.bottom));
-    expect(page.right, closeTo(360 - _readerPadding.right, 0.01));
+    expect(page.center.dy, closeTo(bottomBarCenter, 0.01));
+    expect(
+      page.top,
+      greaterThanOrEqualTo(_screenHeight - _safeBottom - kReaderCornerBarHeight),
+    );
+    expect(page.bottom, lessThanOrEqualTo(_screenHeight - _safeBottom));
+    expect(page.right, closeTo(360 - _inset, 0.01));
 
     final clock = tester.getRect(find.text('09:05'));
-    expect(clock.left, closeTo(_readerPadding.left, 0.01));
-    expect(clock.top, closeTo(page.top, 0.01));
+    expect(clock.left, closeTo(_inset, 0.01));
+    expect(clock.center.dy, closeTo(page.center.dy, 0.01));
   });
 
   testWidgets('滚动式阅读器：右下角显示进度文案而不是页码', (WidgetTester tester) async {
@@ -93,7 +106,10 @@ void main() {
       const ReaderCorners(
         chapterTitle: '第二章',
         color: Colors.black,
-        padding: _readerPadding,
+        safeTop: _safeTop,
+        safeBottom: _safeBottom,
+        leftInset: _inset,
+        rightInset: _inset,
         progressText: '42% 已读',
       ),
     );
@@ -111,7 +127,10 @@ void main() {
       const ReaderCorners(
         chapterTitle: '第一章',
         color: Colors.black,
-        padding: _readerPadding,
+        safeTop: _safeTop,
+        safeBottom: _safeBottom,
+        leftInset: _inset,
+        rightInset: _inset,
         pageNumber: 1,
         pageCount: 1,
       ),
@@ -131,7 +150,10 @@ void main() {
       const ReaderCorners(
         chapterTitle: '序章',
         color: Colors.black,
-        padding: _readerPadding,
+        safeTop: _safeTop,
+        safeBottom: _safeBottom,
+        leftInset: _inset,
+        rightInset: _inset,
         pageNumber: 8,
         pageCount: 27,
       ),
